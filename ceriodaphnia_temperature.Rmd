@@ -9,9 +9,46 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-read in data
+###read in data and packages  
 ```{r}
+setwd("~/Documents/GitHub/2022-thermal-zoop-experiments")
+lt_mortality<-read.csv("lifetable_mortality.csv")
+lt<-read.csv("raw_lifetable.csv")
+lt_lengths<-read.csv("lifetable_day_5_lengths.csv")
+
+#packages
+library(ggplot2)
+library(tidyverse)
+```
+
+###life table data: effects of temperature on cerio  
+```{r}
+#filter lifetable mortality data to just cerio and look at lifespan at each temperature
+ggplot(filter(lt_mortality,species=="cerio"),aes(x=temp_id,y=lifespan,color=as.factor(mean_temp)))+geom_point()+theme_bw()+ylab("Lifespan (days)")+xlab("Temperature (deg C)")+facet_wrap(.~as.factor(inf))
+#0 = uninfected, 1 = infected, NA = inf not assessed
+
+#Many cerio dapnia removed at end of experiment so lifespan is greater than those graphed. Find number removed for each temperature and mean lifespan
+cerio_removed <- lt_mortality %>% filter(species=="cerio"&removed=="1") %>% group_by(temp_id,inf) %>% summarize(cerio_removed = sum(removed)) %>% ggplot(aes(x=temp_id,y=cerio_removed))+geom_point()+theme_bw()
+cerio_removed
+```
+Both uninfected and infected Cerio live longer at cooler temperatures. Infection reduces lifespan at all temperatures  
+
+###Spore yield and temperature
+```{r}
+#First look at spore yield
+ggplot(filter(lt_mortality,species=="cerio"&inf=="1"),aes(x=temp_id,y=spore_RAW))+geom_boxplot()+theme_bw()
+
+#Now look at body size
+ggplot(filter(lt_mortality,species=="cerio"&inf=="1"),aes(x=temp_id,y=length_RAW))+geom_boxplot()+theme_bw()
+
+#Look at spore yield and body size
+ggplot(filter(lt_mortality,species=="cerio"&inf=="1"),aes(x=temp_id,y=spore_RAW/length_RAW))+geom_boxplot()+theme_bw()
+```
+Ceriodaphnia tend to be bigger at higher temperatures but spore yield is pretty consistent across temperatures. Spore yield/body size is slightly elevated at higher temperatures
+
+```{r}
+cerio_summary <- lt_mortality %>% group_by(temp_id,inf) %>% summarize(mean_lifespan = mean(lifespan,na.rm=T),
+                                                                  lifespan_se = sd(lifespan)/sqrt(length(lifespan)))
 
 ```
 
-life table data: effects of temperature on cerio
