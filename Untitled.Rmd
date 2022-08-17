@@ -1,0 +1,17 @@
+---
+title: "Ceriodaphnia temperature effects"
+author: "Katie Schroeder"
+date: "8/17/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+read in data
+```{r}
+
+```
+
+life table data: effects of temperature on cerio
