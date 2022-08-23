@@ -77,3 +77,5 @@ ggplot(filter(summary_ep_ot,community=="CM"),aes(x=sample_date,y=mean_epidemic_s
   geom_point()+facet_wrap(.~community)+theme_bw()+
   geom_pointrange(aes(ymin=mean_epidemic_size_ind_c-se_epidemic_size_ind_c,ymax=mean_epidemic_size_ind_c+se_epidemic_size_ind_c)) + 
   ylab("daphnia epidemic size (total inf individuals)")
+
+#next steps: look at host density at the date of spore addition and look at ratios of cerio to daphnia and epidemic size in the DCM communities
