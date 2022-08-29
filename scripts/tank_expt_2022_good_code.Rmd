@@ -1,0 +1,420 @@
+---
+title: "2022 Tank Experiment REU + a month"
+author: "Katie Schroeder"
+date: "8/2/2022"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+General notes:
+##trapZ - integrated area under the curve. As time series
+##Coefficient of variation to look at how much they cycle - standard deviation/mean
+##Jessica Hite - dissertation chapter - synchrony and size structure
+##Infection prev vs density of inf hosts. Diff metric of disease may matter. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+##Experiment Overview
+
+###Boring set up stuff
+Packages
+```{r, message = FALSE,warning=FALSE}
+library(tidyverse)
+library(magrittr)
+library(ggnewscale)
+library(lubridate)
+```
+
+Reading in data
+Most recent copies of data live in the drive - links in the experiment protocol. YSI data lives in Dropbox.
+```{r, message = F}
+setwd("~/Documents/GitHub/2022-thermal-zoop-experiments")
+meta <- read.csv("tank_metadata.csv")
+counts <- read.csv("tank_counts.csv")
+ysi <- read_csv("tank_ysi.csv")
+```
+
+Fixing YSI data to look normal
+```{r}
+ysi %<>% rename('temp_f' = '?F-21A104910', "do_per" = "DO %-21A106679", "do_conc" = "DO mg/L-21A106679",
+                "ph" = "pH-21B101988", "ph_mv" = "pH mV-21B101988", "chlor_rfu" = "Chlorophyll RFU-21B101736",
+                "chlor_conc" = "Chlorophyll ug/L-21B101736")
+ysi %<>% mutate(bucket = as.factor(as.numeric(gsub("Tank ", "", Site))))
+ysi %<>% mutate(temp_c = (temp_f-32)*(5/9))
+ysi$Date <- mdy(ysi$Date)
+```
+
+```{r}
+meta$bucket <- as.factor(meta$bucket)
+counts$bucket <- as.factor(counts$bucket)
+```
+
+##Zooplankton Data
+Set up total, daphnia and cerio prevalence calculations:  
+Total = sum of all zooplankton (cerio+daphnia)  
+Daphnia = sum of all Daphnia (inf + uninf, juv + adult, males included)  
+Cerio = sum of all Cerio (inf + uninf)  
+Daphnia_inf = inf juveniles and adults  
+Daphnia_sus = uninf juveniles and adults  
+Daphnia_prev = inf Daphnia / total number of Daphnia  
+Cerio_prev = inf Cerio / total number of Cerio  
+D_ratio = number of Daphnia / total Zooplankton (% Daphnia)  
+```{r}
+data$community <- as.factor(data$community)
+data$sample_date <- mdy(data$sample_date)
+data$zoop_date <- mdy(data$zoop_date)
+data$spore_date <- mdy(data$spore_date)
+data %<>% mutate(total = rowSums(across(juvenile_daphnia_uninf:cerio_inf),na.rm=T), 
+                 daphnia = rowSums(across(juvenile_daphnia_uninf:male_daphnia_inf),na.rm=T),
+                 cerio = rowSums(across(cerio_uninf:cerio_inf)),
+                 treatment = paste(community, temp, sep="_"),
+                 daphnia_inf = rowSums(across(contains("daphnia_inf")),na.rm=T),
+                 daphnia_sus = rowSums(across(contains("daphnia_uninf")),na.rm=T),
+                 daphnia_prev = daphnia_inf/daphnia,
+                 daphnia_inf_status = ifelse(daphnia_prev>0,"inf","uninf"),
+                 cerio_prev = cerio_inf/cerio,
+                 cerio_inf_status = ifelse(cerio_prev>0,"inf","uninf"),
+                 d_ratio = daphnia/total,
+                 juveniles = juvenile_daphnia_inf+juvenile_daphnia_uninf,
+                 j_ratio = juveniles/daphnia)
+#Time to try and get days between sample date and the start date
+data %<>% mutate(days_since_hosts_added = as.Date(sample_date)-as.Date(zoop_date),
+                 days_since_spores_added = as.Date(sample_date)-as.Date(spore_date))
+#Set up another version of the data frame that has infected and susceptible Daphnia counts in one column for easier SI graphing
+data_long <- pivot_longer(data,cols = c("daphnia_inf","daphnia_sus"),names_to="daphnia_SI_status",values_to="daphnia_SI_count")
+```
+
+```{r,eval=FALSE,include=FALSE}
+#This chunk can be used to make the super messy graphs that show all buckets separated by community
+ggplot(data,aes(x=sample_date,y=total, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + theme(legend.position = "none") + facet_wrap(vars(community))+theme_bw()
+ggplot(data,aes(x=sample_date,y=daphnia, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() +  facet_wrap(vars(community))+theme_bw() 
+ggplot(data,aes(x=sample_date,y=cerio_uninf, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_wrap(vars(community))+theme_bw() 
+```
+
+###Totals (All zoops, Daphnia, Cerio) faceted by temp treatment and community composition  
+How do densities of zooplankton vary between temperature and different community compositions?  
+```{r}
+ggplot(data,aes(x=sample_date,y=total, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + theme(legend.position = "none") + facet_grid(rows= vars(temp), cols = vars(community)) + theme_bw() + ylab("Total zoop density") + ggtitle("Total Zoop")
+ggplot(data,aes(x=sample_date,y=daphnia, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Total Daphnia density") + ggtitle("Daphnia")
+ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_uninf, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Total Cerio density") + ggtitle("Cerio")
+```
+
+####Now doing it all again on a log scale  
+```{r,message=FALSE,warning=FALSE}
+ggplot(data,aes(x=sample_date,y=total, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + theme(legend.position = "none") + facet_grid(rows= vars(temp), cols = vars(community)) + theme_bw() + ylab("Total zoop density (log scale)") + ggtitle("Total Zoop") + scale_y_continuous(trans='log10')
+ggplot(data,aes(x=sample_date,y=daphnia, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Total Daphnia density (log scale)") + ggtitle("Daphnia") + scale_y_continuous(trans='log10')
+ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_uninf, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Total Cerio density (log scale)") + ggtitle("Cerio") + scale_y_continuous(trans='log10')
+```
+####Which buckets have bottomed out?
+```{r}
+no_daphnia<- data %>% filter(community!="CM"&daphnia=="0")
+unique(no_daphnia$bucket)
+
+no_cerio <- data %>% filter(community=="CM"&cerio=="0")
+unique(no_cerio$bucket)
+
+#Make summary statistics for density after July 15
+density_summary_omit <- data %>% filter(bucket!="22"|bucket!="23"|bucket!="26"|bucket!="30"|bucket!="43") %>% group_by(treatment) %>% summarize(mean_cerio_o = mean(cerio),
+                                                                se_cerio = sqrt(var(cerio,na.rm=T)/n()),
+                                                                mean_daphnia = mean(daphnia),
+                                                                se_daphnia = sqrt(var(daphnia,na.rm=T)/n()))
+```
+
+
+####Which CM buckets are contaminated with Daphnia?
+```{r}
+contaminated_CM <- data %>% filter(community=="CM"&daphnia>2)
+unique(contaminated_CM$bucket)
+```
+CM buckets for each temperature:
+15C: 33-36
+20C: 37-40
+25C: 41-44
+Var: 45-48
+
+####Taking total density data and incorporating if any Daphnia or Ceriodaphnia were infected during that sampling
+```{r}
+ggplot(filter(data,community!="CM"),aes(x=sample_date,y=daphnia, color=daphnia_inf_status))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Total Daphnia density") + ggtitle("Daphnia")
+ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_uninf, color=cerio_inf_status))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Total Cerio density") + ggtitle("Cerio")
+#Can do color as continuous prevalence but it's harder to see which buckets had infections
+```
+
+###Infection data
+####Infected individuals
+```{r}
+ggplot(data,aes(x=sample_date,y=daphnia_inf, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Daphnia Inf Individuals (log scale)") + ggtitle("Daphnia I") + scale_y_continuous(trans='log10')
+
+ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_inf, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Cerio Inf Individuals (log scale)") + ggtitle("Cerio I") + scale_y_continuous(trans='log10')
+
+#Cerio density vs cerio inf
+ggplot(filter(data,community=="CM"&daphnia<=3),aes(x=cerio,y=cerio_inf,color=temp))+ geom_point() + scale_color_discrete() + facet_wrap(.~temp) +theme_bw() + ylab("Cerio Inf Individuals") + ggtitle("Cerio Inf/Density")
+```
+
+####Prevalence
+```{r,message=FALSE,warning=FALSE}
+ggplot(data,aes(x=sample_date,y=daphnia_prev, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Daphnia Inf Prev (log scale)") + ggtitle("Daphnia Prev")+ scale_y_continuous(trans='log10')
+
+ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_prev, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Cerio Inf Prev (log scale)") + ggtitle("Cerio Prev")+ scale_y_continuous(trans='log10')
+```
+
+###Summary data
+```{r,include=F}
+#try filtering out 26 and 30 for 25 and var
+summary <- data %>% group_by(treatment, sample_date) %>% summarize(mean_juvenile = mean(juvenile_daphnia_uninf),
+                                                                se_juvenile_daphnia_uninf=sqrt(var(juvenile_daphnia_uninf,na.rm=T)/n()),
+                                                                mean_adult = mean(adult_daphnia_uninf),
+                                                                se_adult = sqrt(var(adult_daphnia_uninf,na.rm=T)/n()),
+                                                                mean_cerio = mean(cerio_uninf),
+                                                                se_cerio = sqrt(var(cerio_uninf,na.rm=T)/n()),
+                                                                mean_daphnia = mean(daphnia),
+                                                                se_daphnia = sqrt(var(daphnia,na.rm=T)/n()),
+                                                                mean_total = mean(total),
+                                                                se_total = sqrt(var(total,na.rm=T)/n()),
+                                                                mean_daphnia_inf = mean(daphnia_inf),
+                                                                se_daphnia_inf = sqrt(var(daphnia_inf,na.rm=T)/n()),
+                                                                mean_cerio_inf = mean(cerio_inf),
+                                                                se_cerio_inf = sqrt(var(cerio_inf,na.rm=T)/n()),
+                                                                mean_daphnia_prev = mean(daphnia_prev),
+                                                                se_daphnia_prev = sqrt(var(daphnia_prev,na.rm=T)/n()),
+                                                                mean_cerio_prev = mean(cerio_prev),
+                                                                se_cerio_prev = sqrt(var(cerio_prev,na.rm=T)/n()),
+                                                                mean_d_ratio = mean(d_ratio),
+                                                                se_d_ratio = sqrt(var(d_ratio,na.rm=T)/n()),
+                                                                mean_j_ratio = mean(j_ratio),
+                                                                se_j_ratio = sqrt(var(j_ratio,na.rm=T)/n()),
+                                                                temp = temp,
+                                                                community = community)
+```
+
+####Summary graphs by sampling date for temperature trends in density and infection
+Spores were introduced 7/11/2022, first infections observed 7/18/2022 
+
+```{r,message=F,warning=FALSE,eval=FALSE,include=FALSE}
+ggplot(summary,aes(x=temp,y=mean_total,color=community))+geom_point()+geom_pointrange(aes(ymin=mean_total-se_total,ymax=mean_total+se_total))+geom_line(aes(group=community))+facet_wrap(.~sample_date,nrow=2)+theme_bw()+ scale_y_continuous(trans='log10')+ylab("Total Zoop Density (log scale)")
+
+ggplot(filter(summary,community!="CM"),aes(x=temp,y=mean_daphnia,color=community))+geom_point()+geom_pointrange(aes(ymin=mean_daphnia-se_daphnia,ymax=mean_daphnia+se_daphnia))+geom_line(aes(group=community))+facet_wrap(.~sample_date,nrow=2)+theme_bw()+ scale_y_continuous(trans='log10')+ylab("Total Daphnia Density (log scale)")
+
+##By sample date
+ggplot(filter(summary,community!="CM"),aes(x=sample_date,y=mean_daphnia,color=temp))+geom_point()+geom_pointrange(aes(ymin=mean_daphnia-se_daphnia,ymax=mean_daphnia+se_daphnia))+geom_line(aes(group=temp))+facet_wrap(.~community,nrow=1)+theme_bw()+ scale_y_continuous(trans='log10')+ylab("Total Daphnia Density (log scale)")
+
+ggplot(filter(summary,community=="CM"|community=="DCM"),aes(x=temp,y=mean_cerio,color=community))+geom_point()+geom_pointrange(aes(ymin=mean_cerio-se_cerio,ymax=mean_cerio+se_cerio))+geom_line(aes(group=community))+facet_wrap(.~sample_date,nrow=2)+theme_bw()+ scale_y_continuous(trans='log10')+ylab("Total Cerio Density (log scale)")
+```
+
+####Infection summary graphs   
+```{r,message=F,warning=FALSE}
+
+ggplot(filter(summary,community!="CM"),aes(x=sample_date,y=mean_daphnia_prev,color=temp))+geom_point()+geom_pointrange(aes(ymin=mean_daphnia_prev-se_daphnia_prev,ymax=mean_daphnia_prev+se_daphnia_prev))+geom_line(aes(group=temp))+facet_wrap(.~community,nrow=1)+theme_bw()+ylab("Daphnia Inf Prev")
+
+ggplot(filter(summary,community=="CM"|community=="DCM"),aes(x=sample_date,y=mean_cerio_prev,color=temp))+geom_point()+geom_pointrange(aes(ymin=mean_cerio_prev-se_cerio_prev,ymax=mean_cerio_prev+se_cerio_prev))+geom_line(aes(group=temp))+facet_wrap(.~community,nrow=1)+theme_bw()+ylab("Cerio Inf Prev")
+```
+###Epidemic Size - measuring area under the epidemic curve
+```{r}
+#First visualize epidemics in each temperature and community treatment again - ignore CM for now
+data %>% filter(days_since_spores_added>=0&community!="CM") %>% ggplot(.,aes(x=days_since_spores_added,y=daphnia_prev,color=temp))+geom_point()+geom_line(aes(group = bucket)) + facet_grid(rows= vars(temp), cols = vars(community))+theme_bw()
+
+#To use trapz
+library(pracma)
+
+#Try it as a for loop ):
+buckets <- unique(data$bucket)
+epidemic_size_df <- data.frame(bucket <- buckets)
+
+for (i in 1:length(buckets)){
+  sample_data <- data[data$bucket==buckets[i],]
+  #relevant extra info
+  epidemic_size_df$temp[i] <- as.character(sample_data$temp[1])
+  epidemic_size_df$community[i] <- as.character(sample_data$community[1])
+  epidemic_size_df$treatment[i] <- as.character(sample_data$treatment[1])
+  #now try to actually integrate
+  epidemic_size_df$epidemic_size[i] <- trapz(as.numeric(sample_data$days_since_spores_added),matrix(as.numeric(sample_data$daphnia_prev)))
+  epidemic_size_df$epidemic_size_ind[i] <- trapz(as.numeric(sample_data$days_since_spores_added),matrix(as.numeric(sample_data$daphnia_inf)))
+  #add cerio in
+  epidemic_size_df$epidemic_size_c[i] <- trapz(as.numeric(sample_data$days_since_spores_added),matrix(as.numeric(sample_data$cerio_prev)))
+  epidemic_size_df$epidemic_size_ind_c[i] <- trapz(as.numeric(sample_data$days_since_spores_added),matrix(as.numeric(sample_data$cerio_inf)))
+}
+
+#making the epidemic_size_df nicer to work with
+epidemic_size_df %<>% rename(bucket = bucket....buckets) 
+
+#raw data
+ggplot(filter(epidemic_size_df,community!="CM"),aes(x=temp,y=epidemic_size,color=temp))+geom_point()+facet_wrap(.~community)+theme_bw()
+ggplot(filter(epidemic_size_df,community!="CM"),aes(x=temp,y=epidemic_size_ind,color=temp))+geom_point()+facet_wrap(.~community)+theme_bw()
+
+#summarized epidemic data
+summary_ep <- filter(epidemic_size_df,bucket!="26"&bucket!="30"&bucket!="22"&bucket!="23"&bucket!="43") %>% group_by(treatment) %>% summarize(mean_epidemic_size = mean(epidemic_size,na.rm=T),
+                                                                se_epidemic_size=sqrt(var(epidemic_size)/n()),
+                                                                mean_epidemic_size_ind = mean(epidemic_size_ind,na.rm=T),
+                                                                se_epidemic_size_ind=sqrt(var(epidemic_size_ind)/n()),
+                                                                mean_epidemic_size_c = mean(epidemic_size_c,na.rm=T),
+                                                                se_epidemic_size_c=sqrt(var(epidemic_size_c)/n()),
+                                                                mean_epidemic_size_ind_c = mean(epidemic_size_ind_c,na.rm=T),
+                                                                se_epidemic_size_ind_c=sqrt(var(epidemic_size_ind_c)/n()),
+                                                                temp = unique(temp),
+                                                                community = unique(community))
+ggplot(filter(summary_ep,community!="CM"),aes(x=temp,y=mean_epidemic_size,color=temp))+geom_point()+facet_wrap(.~community)+theme_bw()+geom_pointrange(aes(ymin=mean_epidemic_size-se_epidemic_size,ymax=mean_epidemic_size+se_epidemic_size)) + ylab("daphnia epidemic size (prevalence days)")
+
+ggplot(filter(summary_ep,community!="CM"),aes(x=temp,y=mean_epidemic_size_ind,color=temp))+geom_point()+facet_wrap(.~community)+theme_bw()+geom_pointrange(aes(ymin=mean_epidemic_size_ind-se_epidemic_size_ind,ymax=mean_epidemic_size_ind+se_epidemic_size_ind)) + ylab("epidemic size (total inf daphnia)")
+
+ggplot(filter(summary_ep,community=="CM"|community=="DCM"),aes(x=temp,y=mean_epidemic_size_c,color=temp))+geom_point()+facet_wrap(.~community)+theme_bw()+geom_pointrange(aes(ymin=mean_epidemic_size_c-se_epidemic_size_c,ymax=mean_epidemic_size_c+se_epidemic_size_c)) + ylab("cerio epidemic size (prevalence days)")
+
+ggplot(filter(summary_ep,community=="CM"|community=="DCM"),aes(x=temp,y=mean_epidemic_size_ind_c,color=temp))+geom_point()+facet_wrap(.~community)+theme_bw()+geom_pointrange(aes(ymin=mean_epidemic_size_ind_c-se_epidemic_size_ind_c,ymax=mean_epidemic_size_ind_c+se_epidemic_size_ind_c)) + ylab("total inf cerio")
+```
+####How does density at the beginning of the epidemic affect epidemic size? Look at densities before first infections were identified and then compare to epidemic size
+```{r}
+#first get data frame with density of daphnia and cerio before first infections (7/14)
+density_epidemic <- data %>% filter(sample_date=="2022-07-14") %>% select(sample_date,bucket,daphnia,cerio,treatment) %>% left_join(epidemic_size_df,by="bucket")
+
+ggplot(filter(density_epidemic,community!="CM"&community!="D"),aes(x=daphnia,y=epidemic_size,color=temp))+
+  geom_point()+
+  theme_bw()+
+  facet_wrap(.~community)
+
+ggplot(filter(density_epidemic,community!="CM"&community!="D"),aes(x=daphnia,y=epidemic_size_ind,color=temp))+
+  geom_point()+
+  theme_bw()+
+  facet_wrap(.~community)
+
+ggplot(filter(density_epidemic,community=="CM"|community=="DCM"),aes(x=cerio,y=epidemic_size_c,color=temp))+
+  geom_point()+
+  theme_bw()+
+  facet_wrap(.~community)
+
+ggplot(filter(density_epidemic,community=="CM"|community=="DCM"),aes(x=cerio,y=epidemic_size_ind_c,color=temp))+
+  geom_point()+
+  theme_bw()+
+  facet_wrap(.~community)
+
+#remove buckets that bottomed out
+density_epidemic <- filter(density_epidemic,bucket!="22",bucket!="23"|bucket!="26"|bucket!="30"|bucket!="43")
+ggplot(filter(density_epidemic,community!="CM"&community!="D"),aes(x=daphnia,y=epidemic_size,color=temp))+
+  geom_point()+
+  theme_bw()+
+  facet_wrap(.~community)
+
+ggplot(filter(density_epidemic,community!="CM"&community!="D"),aes(x=daphnia,y=epidemic_size_ind,color=temp))+
+  geom_point()+
+  theme_bw()+
+  facet_wrap(.~community)
+
+ggplot(filter(density_epidemic,community=="CM"|community=="DCM"),aes(x=cerio,y=epidemic_size_c,color=temp))+
+  geom_point()+
+  theme_bw()+
+  facet_wrap(.~community)
+
+ggplot(filter(density_epidemic,community=="CM"|community=="DCM"),aes(x=cerio,y=epidemic_size_ind_c,color=temp))+
+  geom_point()+
+  theme_bw()+
+  facet_wrap(.~community)
+```
+
+
+###Daphnia and Cerio ratios and 20C vs Var infection for Jenavier's project
+####Daphnia:cerio ratio for all treatments
+```{r}
+data %>% filter(community=="DCM") %>% ggplot(., aes(x=sample_date,y=d_ratio, color = temp)) + geom_point() +geom_line(aes(group = bucket)) + facet_wrap(vars(temp))+theme_bw()
+```
+
+For Jenavier, how do D to C ratios vary in var vs constant 20C temp buckets?
+```{r}
+#D to C ratio graph for all temperature DCM buckets
+ggplot(filter(summary,community=="DCM"),aes(x=temp,y=mean_d_ratio,color=temp))+geom_point()+geom_pointrange(aes(ymin=mean_d_ratio-se_d_ratio,ymax=mean_d_ratio+se_d_ratio))+facet_wrap(.~sample_date,nrow=1)+theme_bw()+xlab("Treatment")+ylab("Mean ratio of Daphnia to Ceriodaphnia")
+
+#D to C ratio graph for just the 20 and var DCM buckets
+#ggplot(filter(summary,community=="DCM"&(temp=="20"|temp=="var")),aes(x=temp,y=mean_d_ratio,color=temp))+geom_pointrange(aes(ymin=mean_d_ratio-se_d_ratio,ymax=mean_d_ratio+se_d_ratio))+facet_wrap(.~sample_date,nrow=1)+theme_bw()+xlab("Treatment")+ylab("Mean ratio of Daphnia to Ceriodaphnia")
+ggplot(filter(summary,community=="DCM"&(temp=="20"|temp=="var")),aes(x=sample_date,y=mean_d_ratio,color=temp))+geom_pointrange(aes(ymin=mean_d_ratio-se_d_ratio,ymax=mean_d_ratio+se_d_ratio))+geom_line(aes(group=temp))+theme_bw()+xlab("Treatment")+ylab("Mean ratio of Daphnia to Ceriodaphnia")
+
+#Infection Prevalence data
+ggplot(filter(summary,community=="DCM"&(temp=="20"|temp=="var")),aes(x=sample_date,y=mean_daphnia_prev,color=temp))+geom_point()+geom_errorbar(aes(ymin=mean_daphnia_prev-se_daphnia_prev,ymax=mean_daphnia_prev+se_daphnia_prev),width=0.2)+geom_line(aes(group=temp))+theme_bw()+xlab("Treatment")+ylab("Mean inf prev")
+```
+
+###Epidemic size - integrating under the curve 
+To be added
+
+###Juvenile and Adult Ratio
+```{r,message=F,warning=F}
+ggplot(data, aes(x=sample_date, y=j_ratio, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + facet_grid(rows= vars(temp), cols = vars(community))+theme_bw()
+
+#Look at j_ratio for just D vs DM buckets
+ggplot(filter(summary,community=="D"|community=="DM"),aes(x=sample_date,y=mean_j_ratio,color=community))+ geom_point() + geom_line(aes(group=community)) + geom_errorbar(aes(ymin=mean_j_ratio-se_j_ratio,ymax=mean_j_ratio+se_j_ratio),width=0.2) + facet_wrap(.~temp,nrow=2)
+
+ggplot(filter(summary,community=="D"),aes(x=sample_date,y=mean_j_ratio,color=temp))+ geom_point() + geom_line(aes(group=temp)) + geom_errorbar(aes(ymin=mean_j_ratio-se_j_ratio,ymax=mean_j_ratio+se_j_ratio),width=0.2)+theme_bw()
+```
+
+##YSI data
+
+ysi
+```{r}
+ysi_summ <- ysi %>% group_by(bucket, Date) %>% summarize(temp_f = mean(temp_f),
+                                                         temp_c = mean(temp_c),
+                                                         do_per = mean(do_per),
+                                                         do_conc = mean(do_conc),
+                                                         ph = mean(ph),
+                                                         ph_mv = mean(ph_mv),
+                                                         chlor_rfu = mean(chlor_rfu),
+                                                         chlor_conc = mean(chlor_conc))
+ysi_summ %<>% left_join(.,meta, by = "bucket")
+ggplot(ysi_summ,aes(x=chlor_conc,y=chlor_rfu))+geom_point()
+```
+
+
+temp
+```{r}
+# ggplot(ysi_summ, aes(x=Date, y=temp_c, color = bucket)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + theme(legend.position = "none")
+ggplot(ysi_summ, aes(x=Date, y=temp_c, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+```
+
+```{r}
+ysi_summ %>% filter(pool == 7) %>% ggplot(., aes(x=Date, y=temp_c, color = bucket)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + theme(legend.position = "none")
+```
+
+do_per
+```{r}
+# ggplot(ysi_summ, aes(x=Date, y=do_per, color = community)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_wrap(vars(temp))
+#
+# ggplot(ysi_summ, aes(x=Date, y=do_per, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_wrap(vars(community))
+ggplot(ysi_summ, aes(x=Date, y=do_per, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))+theme_bw()
+```
+
+ph
+```{r}
+# ggplot(ysi_summ, aes(x=Date, y=ph, color = community)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_wrap(vars(temp))
+#
+# ggplot(ysi_summ, aes(x=Date, y=ph, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_wrap(vars(community))
+ggplot(ysi_summ, aes(x=Date, y=ph, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))+theme_bw()
+
+ggplot(filter(ysi_summ,bucket=="26"|bucket=="30"), aes(x=Date, y=ph, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+```
+
+chlor_conc
+```{r}
+# ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = community)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() +  facet_wrap(vars(temp))
+#
+# ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() +  facet_wrap(vars(community))
+ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community)) + scale_y_continuous(trans='log10')+theme_bw()
+
+#figure out later
+#ggplot(filter(ysi_summ,bucket=="26"|bucket=="28",bucket=="30"), aes(x=Date, y=chlor_conc, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_wrap(.~bucket)
+
+min_chlor<-min(ysi_summ$chlor_conc)
+ysi_summ$log_chlor<-log10(ysi_summ$chlor_conc+min_chlor+0.0001)
+
+```
+according to temp
+```{r}
+ggplot(ysi_summ, aes(x=Date, y=temp_c, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+ggplot(ysi_summ, aes(x=Date, y=do_per, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+ggplot(ysi_summ, aes(x=Date, y=ph_mv, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+ggplot(ysi_summ, aes(x=Date, y=ph, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+ggplot(ysi_summ, aes(x=Date, y=chlor_rfu, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))+ scale_y_continuous(trans='log10')
+```
+
+according to pool
+```{r}
+ggplot(ysi_summ, aes(x=Date, y=temp_c, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(pool), cols = vars(community))
+ggplot(ysi_summ, aes(x=Date, y=do_per, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(pool), cols = vars(community))
+ggplot(ysi_summ, aes(x=Date, y=ph, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(pool), cols = vars(community))
+ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(pool), cols = vars(community))
+```
