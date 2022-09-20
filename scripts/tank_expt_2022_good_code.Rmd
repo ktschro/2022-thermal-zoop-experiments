@@ -30,7 +30,7 @@ library(lubridate)
 Reading in data
 Most recent copies of data live in the drive - links in the experiment protocol. YSI data lives in Dropbox.
 ```{r, message = F}
-setwd("~/Documents/GitHub/2022-thermal-zoop-experiments")
+setwd("~/Documents/GitHub/2022-thermal-zoop-experiments/raw-tank-data")
 meta <- read.csv("tank_metadata.csv")
 counts <- read.csv("tank_counts.csv")
 ysi <- read_csv("tank_ysi.csv")
@@ -62,6 +62,8 @@ Daphnia_prev = inf Daphnia / total number of Daphnia
 Cerio_prev = inf Cerio / total number of Cerio  
 D_ratio = number of Daphnia / total Zooplankton (% Daphnia)  
 ```{r}
+data<-left_join(counts,meta, by="bucket")
+
 data$community <- as.factor(data$community)
 data$sample_date <- mdy(data$sample_date)
 data$zoop_date <- mdy(data$zoop_date)
@@ -154,9 +156,9 @@ ggplot(filter(data,community=="CM"&daphnia<=3),aes(x=cerio,y=cerio_inf,color=tem
 
 ####Prevalence
 ```{r,message=FALSE,warning=FALSE}
-ggplot(data,aes(x=sample_date,y=daphnia_prev, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Daphnia Inf Prev (log scale)") + ggtitle("Daphnia Prev")+ scale_y_continuous(trans='log10')
+ggplot(data,aes(x=sample_date,y=daphnia_prev, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Daphnia Inf Prev (log scale)") + ggtitle("Daphnia Prev")
 
-ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_prev, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Cerio Inf Prev (log scale)") + ggtitle("Cerio Prev")+ scale_y_continuous(trans='log10')
+ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_prev, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Cerio Inf Prev (log scale)") + ggtitle("Cerio Prev")
 ```
 
 ###Summary data
