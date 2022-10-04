@@ -262,6 +262,9 @@ ggplot(filter(summary_ep,community!="CM"),aes(x=temp,y=mean_epidemic_size_ind,co
 ggplot(filter(summary_ep,community=="CM"|community=="DCM"),aes(x=temp,y=mean_epidemic_size_c,color=temp))+geom_point()+facet_wrap(.~community)+theme_bw()+geom_pointrange(aes(ymin=mean_epidemic_size_c-se_epidemic_size_c,ymax=mean_epidemic_size_c+se_epidemic_size_c)) + ylab("cerio epidemic size (prevalence days)")
 
 ggplot(filter(summary_ep,community=="CM"|community=="DCM"),aes(x=temp,y=mean_epidemic_size_ind_c,color=temp))+geom_point()+facet_wrap(.~community)+theme_bw()+geom_pointrange(aes(ymin=mean_epidemic_size_ind_c-se_epidemic_size_ind_c,ymax=mean_epidemic_size_ind_c+se_epidemic_size_ind_c)) + ylab("total inf cerio")
+
+##FOR GRFP
+ggplot(filter(summary_ep,community=="DCM"),aes(temp,y=mean_epidemic_size))+geom_point()+theme_bw()+theme(legend.position = "none")+geom_pointrange(aes(ymin=mean_epidemic_size-se_epidemic_size,ymax=mean_epidemic_size+se_epidemic_size)) + ylab("Epidemic Size (prevalence*days)")+labs(x=expression(Temperature~(degree*C)))+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 ```
 ####How does density at the beginning of the epidemic affect epidemic size? Look at densities before first infections were identified and then compare to epidemic size
 ```{r}
