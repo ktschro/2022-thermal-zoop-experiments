@@ -1,4 +1,6 @@
 #from https://rdrr.io/github/mnsentinellakes/mnsentinellakes/src/R/compile_do_folder.R MN DNR Sentinel Lakes Program
+#currently need to change serial name in file path (bottom when you run function) 
+#final file name will save as name of the folder the data comes from. For me, that's the serial number of each DO logger
 
 compile_do_folder=function(folderpath,savetofolder){
   
@@ -41,13 +43,12 @@ compile_do_folder=function(folderpath,savetofolder){
     dofinal=rbind(dorowadd,docombined)
     
     folder=unlist(strsplit(folderpath,split = "/"))[length(unlist(strsplit(folderpath,split = "/")))]
-    serialnum="425218"
     
     if (substr(savetofolder,(nchar(savetofolder)),nchar(savetofolder))!="/"){
       savetofolder=paste0(savetofolder,"/")
     }
     
-    pathout=paste0(savetofolder,serialnum,".csv")
+    pathout=paste0(savetofolder,folder,".csv")
     
     utils::write.csv(dofinal,pathout,row.names = FALSE)
   }else{
