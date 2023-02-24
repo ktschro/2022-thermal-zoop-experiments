@@ -1,5 +1,5 @@
 # Data processing for life table experiment
-#Goals: remove males and missing data, convert spore yields, make a treatment ID
+#Goals: calculate b,d, and r from lifetable data
 
 #read in files, packages ----
 library(bbmle)
@@ -221,3 +221,41 @@ lt.summary_factors %>% filter(species=="daphnia"&resource=="1"&mean_temp=="20") 
 
 # save summary data frame - b,d, little r
 saveRDS(lt.summary_factors, file ="processed-data/lifetable-expt/lifetable_growth_rates_w_CI_2022.rds")
+
+# graphing the difference in r between uninfected and infected groups, just 20 and var
+rates<-readRDS("processed-data/lifetable-expt/lifetable_growth_rates_w_CI_2022.rds")
+rates$temp_var<-as.factor(rates$temp_var)
+rates %>% filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
+  ggplot(.,aes(x=temp_var,y=S.r,color=inf_status)) + 
+  geom_point(position=position_dodge(width=0.1)) + 
+  geom_errorbar(aes(ymax=S.r.975,ymin=S.r.025),width=0,position=position_dodge(width=0.1)) +
+  scale_color_manual("Infection Status", values = c("red", "black")) + 
+  theme_classic(base_size = 14) +
+  ylab("little r") + xlab("2*fluctuation amplitude (°C)") 
+
+rates_uninf <- rates %>% filter(inf_status=="U") %>% select(-c("S.d.975","S.d.025","S.b.975","S.b.025","S.r.975","S.r.025","resource","species","mean_temp","temp_var","temp_id")) %>% rename(ID_u = ID, S.r_u = S.r, S.d_u=S.d,S.b_u=S.b,inf = inf_status)
+rates_inf<- rates %>% filter(inf_status=="I") %>% select(-c("S.d.975","S.d.025","S.b.975","S.b.025","S.r.975","S.r.025"))
+
+rates_wide <- bind_cols(rates_inf,rates_uninf) 
+rates_wide %<>% mutate(diff_d = S.d - S.d_u,
+                       diff_b = S.b - S.b_u,
+                       diff_r = S.r_u - S.r) %>%
+  select("ID","diff_b","diff_r","diff_d") %>%
+  pivot_longer(cols = starts_with("diff_"),names_to = "rate",names_prefix = "diff_",values_to = "diff")
+
+rates_wide %<>% 
+  #separate(ID,c('species','temp_ID','resource','idk'),sep="_") %>%
+  mutate(temp_var = case_when(
+  temp_ID == "2V" ~ "2",
+  temp_ID == "6V" ~ "6",
+  temp_ID == "14V" ~ "14",
+  TRUE ~ "0"
+))
+
+rates_wide %>% filter(resource =="1" & species == "daphnia" & (temp_ID != "15"&temp_ID !="20")) %>%
+  ggplot(.,aes(x=factor(temp_var,levels=c('0','2','6','14')),y=diff,color=rate,group=rate)) + 
+  geom_point(size=4)+
+  theme_classic(base_size = 14)+
+  ylab("difference in rate (inf-uninf)") + xlab("2*fluctuation amplitude (°C)")+facet_wrap(.~rate)
+
+
