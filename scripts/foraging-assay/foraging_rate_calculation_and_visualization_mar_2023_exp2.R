@@ -26,6 +26,7 @@ forage %<>%
 #insert each temp into the filter to look at as groups of three. Too slow and confusing to look at everything all at the same time
 forage %>% filter(temp=="15") %>% ggplot(aes(x=numbering,y=read,color=type))+geom_boxplot()+theme_classic()+facet_wrap(.~resource)
 
+
 #step 2: summarizing 
 forage_summary <- forage %>% 
   filter(sample!="0") %>% 
@@ -50,6 +51,13 @@ forage_summary %>% ggplot(aes(x=type,y=mean_read,color=as.factor(type)),group=pl
   geom_errorbar(aes(ymin=mean_read-se_read,ymax=mean_read+se_read),width=.1,position = position_dodge()) +
   theme_bw() +
   facet_grid(vars(resource),vars(temp))
+
+#look at just the 1.0s between each temperature. Should be different and reflect different sizes of grazers
+forage_summary %>% filter(resource=="1"&type!="TT") %>%
+  ggplot(aes(x=temp,y=mean_read,group=plate,color=type)) +
+  geom_point(position=position_dodge(width=0.1)) +
+  geom_errorbar(aes(ymin=mean_read-se_read,ymax=mean_read+se_read),width=.1,position = position_dodge()) +
+  theme_bw() 
 
 #are the controls in each resource treatment different? (i.e. are we getting different reads for higher concentrations of algae)
 forage_summary %>% 
