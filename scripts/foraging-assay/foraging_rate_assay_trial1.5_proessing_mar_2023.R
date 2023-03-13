@@ -15,8 +15,14 @@ forage_boxplot <- forage %>%
   mutate(type = case_when(
     startsWith(sample,"C") ~ "control",
     sample == "TT" ~ "TT",
-    TRUE ~ "trt"))
-forage_boxplot %>% filter(type=="control"|type=="trt") %>% ggplot(aes(x=sample,y=read,color=type))+geom_boxplot()+theme_classic()+facet_wrap(.~resource)
+    TRUE ~ "trt")) %>%
+  group_by(plate) %>%
+  mutate(numbering = case_when(
+      type=="control" ~ "ctrl",
+      type=="TT" ~ "TT",
+      type=="trt" ~ as.character(row_number())
+    ))
+forage_boxplot %>% ggplot(aes(x=sample,y=read,color=type))+geom_boxplot()+theme_classic()+facet_wrap(.~plate)
 
 #remove readings for empty wells and add a column (type) that groups controls, samples, and treated tap wells (first two steps - filter and mutate)
 #then group by type and resource to get averages, standard deviation, standard error, and the number of replicates for each
