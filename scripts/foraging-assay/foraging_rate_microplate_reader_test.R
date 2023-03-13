@@ -1,4 +1,4 @@
-plate<-read.csv("Schroeder_Strauss_2_3_2023_microplate reader_trial_2_all_data.csv")
+plate<-read.csv("processed-data/foraging-assay/Schroeder_Strauss_2_3_2023_microplate reader_trial_2_all_data.csv")
 plate$plate<-as.factor(plate$plate)
 
 library(tidyverse)
