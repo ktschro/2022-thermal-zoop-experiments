@@ -33,22 +33,21 @@ forage_summary <- forage %>%
     sample == "TT" ~ "TT",
     TRUE ~ "trt"
     )) %>%
-  group_by(resource,type) %>%
+  group_by(resource,type,size) %>%
   summarize(mean_read = mean(read),
             sd_read = sd(read),
             se_read = sd_read/sqrt(n()),
             number_of_samples = n(),
-            resource = unique(resource),
-            temp = unique(temp)
+            temp = unique(temp),
             ) 
 
 
 
-forage_summary %>% filter(size!="small") %>% ggplot(aes(x=resource,y=mean_read,group=size,color=as.factor(resource))) +
+forage_summary %>% filter(size!="small") %>% ggplot(aes(x=resource,y=mean_read,group=type,color=as.factor(type))) +
   geom_point(position=position_dodge(width=0.1)) +
   geom_errorbar(aes(ymin=mean_read-se_read,ymax=mean_read+se_read),width=.1,position = position_dodge()) +
   theme_classic() +
-  facet_wrap(.~type)
+  facet_wrap(.~resource)
   
 
 #subdivide into control and trt frames and then merge to get separate columns for control and trt observations

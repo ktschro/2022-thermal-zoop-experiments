@@ -1,14 +1,114 @@
+############################################################################################################################################################################################################################################################################################################################################################################################################################EXPERIMENT 1 - 40 mL tubes####################################################################
+
+#load in data and check structure -----
+forage<- read.csv("raw-data/foraging-rate-assay/Foraging_rate_assay_trial1_feb_2023_data.csv")
+str(forage)
+
+#load in libraries
+library(tidyverse)
+library(magrittr)
+
+#summarize data ----
+forage %<>% mutate(type = case_when(
+  startsWith(sample,"C") ~ "control",
+  sample == "R" ~ "resource",
+  sample == "0" ~ "blank",
+  TRUE ~ "trt"
+))
+
+summary<- forage %>% 
+  group_by(plate,sample) %>% 
+  summarize(mean_read = mean(plate_reader_value),
+            sd = sd(plate_reader_value),
+            se = sd(plate_reader_value)/n(),
+            count = n(),
+            temp = unique(temp),
+            resource = unique(resource),
+            type = unique(type))
+
+
+summary2 <- summary %>% 
+  group_by(temp,resource,type) %>% 
+  summarize(mean_read2 = mean(mean_read),
+            sd2 = sd(mean_read)) %>% 
+  mutate(ID = paste(temp,resource,type,sep="_"))
+
+#control samples across temp and resource
+summary2 %>% 
+  filter(type=="control") %>% 
+  ggplot(aes(x=resource,y=mean_read2, color = as.factor(temp))) + 
+  geom_point() + 
+  geom_errorbar(aes(ymin=mean_read2-sd2,ymax=mean_read2+sd2),width=0.2) + 
+  theme_classic() + 
+  facet_wrap(.~temp) 
+
+#constant 1.0mgC across temps 
+summary2 %>% filter(type=="resource") %>% 
+  ggplot(aes(x=temp,y=mean_read2, color = as.factor(temp))) + 
+  geom_point() + geom_errorbar(aes(ymin=mean_read2-sd2,ymax=mean_read2+sd2),width=0.2) + 
+  theme_classic() 
+
+#calculate foraging rate: ----
+trt <- forage %>% 
+  filter(type=="trt") %>%
+  mutate(sample = as.numeric(sample)) %>%
+  group_by(sample) %>%
+  summarize(mean_plate_reader_value = mean(plate_reader_value),
+            sd_plate_reader_value = sd(plate_reader_value),
+            se_plate_reader_value = sd_plate_reader_value/sqrt(n()),
+            number_of_samples = n(),
+            resource = unique(resource),
+            temp = unique(temp),
+            plate = unique(plate)
+  ) %>%
+  select(-c(number_of_samples))
+
+control <- summary %>% 
+  filter(type=="control") %>% 
+  rename(mean_control = mean_read, se_control = se, sd_control = sd) %>% 
+  select(-c(temp, resource,type))
+
+#merge control and trt data frames together by plate so we can calculate
+forage_calc <- merge(trt,control,by="plate",all = TRUE, sort = FALSE)
+
+#### Calculate foraging rate ---- 
+v<- 40 #volume of the water Daphnia were in (in mL)
+t<- 8 #length of foraging rate assay (in hours)
+
+forage_calc %<>%
+  mutate(feeding_rate = log(mean_control/mean_plate_reader_value)*v/t) %>% 
+  group_by(plate) %>% 
+  mutate(numbering=row_number()) %>% as.data.frame()
+
+forage_calc %>% ggplot(aes(x=numbering,y=feeding_rate)) + geom_point() + theme_classic() + facet_wrap(.~plate,nrow=3) + geom_hline(yintercept = 0)
+
+calc_df_summary <- forage_calc %>% 
+  group_by(plate) %>% 
+  summarize(mean=mean(feeding_rate),
+            se=sd(feeding_rate)/sqrt(n())) 
+
+ggplot(calc_df_summary,aes(x=plate,y=mean))+geom_point()+geom_errorbar(aes(ymin=mean-se,ymax=mean+se),width=0.1) + theme_classic() + geom_hline(yintercept = 0)
+
+#make a graph of this with different facets for temperature and/or resource. You'll want to add something in the calc-df_summary generation to make sure you have temperature and resource info to make graphing that easier.
+
+#before you start working with the experiment 2 data, make sure to clear your global environment. You can do this using the broom icon under the environment tab or by using rm(list = ls())
+
+
+######################################################################################################################################################################################################################################################################################################################################################################################################################################################################EXPERIMENT 2 - 15 mL tubes########################## 
+
+
 #experiment: foraging rate assay experiment redo
 #people on project: Katie, Chris, Gabe, and Daniel. Christopher helped with pipetting too
 #purpose of exp: see how temp and resource interact to affect foraging rate. Trial one had some problems, so this one used smaller volumes for the assay (15 mL) and a little more light during the pipetting stage to help prevent errors.
 #Treatments: 15, 20, 25C crossed with 0.1, 0.5, 0.1.0 mgC/L. Replicates per treatment 30. 10 control tubes per treatment. Total number of tubes - 360.
 
-#Import data and load libraries ----
+#import data and load libraries ----
+#change the file path as needed so you can access the file
 forage<-read.csv("processed-data/foraging-assay/Schroeder_Strauss_3_6_2023_microplate reader_expt2.csv")
 library(tidyverse)
 library(magrittr) # %<>%
 
-#Data cleaning and processing ----
+#data cleaning, processing, initial visualizations ----
 #step 1: initial visualization: look at each sample as a boxplot of the three reader values
 forage %<>%
   filter(sample!="0") %>% 
@@ -23,8 +123,8 @@ forage %<>%
     type=="trt" ~ as.character(row_number())
   ))
 
-#insert each temp into the filter to look at as groups of three. Too slow and confusing to look at everything all at the same time
-forage %>% filter(temp=="15") %>% ggplot(aes(x=numbering,y=read,color=type))+geom_boxplot()+theme_classic()+facet_wrap(.~resource)
+#insert each temp (15, 20, 25) into the filter to look at as groups of three. Too slow and confusing to look at everything all at the same time
+forage %>% filter(temp=="25") %>% ggplot(aes(x=numbering,y=read,color=type))+geom_boxplot()+theme_classic()+facet_wrap(.~resource)
 
 
 #step 2: summarizing 
@@ -133,57 +233,3 @@ forage_calc %>% filter(feeding_rate>0) %>% ggplot(aes(x=resource,y=feeding_rate,
   geom_point() +
   theme_classic() + 
   facet_wrap(.~temp) 
-
-# get rid of messy samples ---- 
-#what happens if we get rid of the messiest samples (i.e. ones where there was a lot of variation between reads)?
-#group by plate and sample so each one is distinct for controls and treatment and get rid of ones with a treshold variance amount
-forage_messy <- forage %>% 
-  filter(type=="trt"|type=="control") %>% 
-  group_by(plate, sample) %>% 
-  summarize(mean_read = mean(read),
-            sd_read = sd(read),
-            resource = unique(resource),
-            temp = unique(temp),
-            type=unique(type))
-
-#look at histogram of sd so we can look for some sort of arbitrary cut off
-hist(forage_messy$sd_read, breaks = 50)
-
-#break it off at 1400 for no good reason and subset the forage data
-forage_messy %<>% filter(sd_read <= 500)
-#takes us from 378 samples to 326
-
-#now calculate the foraging rate for the remaining samples
-trt_messy <- forage_messy %>% 
-  filter(type=="trt") 
-control_messy <- forage_messy %>% 
-  filter(type=="control") %>% 
-  rename(mean_control = mean_read, sd_control = sd_read) %>% 
-  select(-c(temp, resource, sample,type))
-
-#merge control and trt data frames together by plate so we can calculate
-forage_calc_messy <- merge(trt_messy,control_messy,by="plate",all = TRUE, sort = FALSE)
-
-#eqn for foraging rate = ln(control_read/sample_read) * v/time. 
-forage_calc_messy %<>% mutate(feeding_rate = log(mean_control/mean_read)*v/t)
-
-#graph the results with a horizontal line at 0
-forage_calc_messy %>% ggplot(aes(x=resource,y=feeding_rate,color=as.factor(resource))) +
-  geom_point() +
-  theme_classic() + 
-  facet_wrap(.~temp) + 
-  geom_hline(yintercept=0)
-
-forage_calc_messy %>% 
-  group_by(plate) %>% 
-  summarize(
-    mean_feed = mean(feeding_rate),
-    se_feed = sd(feeding_rate)/sqrt(n()),
-    temp = unique(temp), 
-    resource = unique(resource)) %>% 
-  ggplot(aes(x=resource,y=mean_feed,color=as.factor(temp))) + 
-  geom_point() + 
-  geom_errorbar(aes(ymin=mean_feed-se_feed,ymax=mean_feed+se_feed),width=0.1) + 
-  theme_classic() + 
-  facet_wrap(.~temp) + 
-  geom_hline(yintercept=0)

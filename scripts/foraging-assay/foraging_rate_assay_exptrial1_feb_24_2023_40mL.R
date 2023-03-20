@@ -2,6 +2,7 @@ forage<- read.csv("raw-data/foraging-rate-assay/Foraging_rate_assay_trial1_feb_2
 str(forage)
 
 library(tidyverse)
+library(magrittr)
 forage %>% filter(sample == "0") %>% ggplot(aes(x=plate,y=plate_reader_value,group=plate,color=as.factor(temp))) + geom_boxplot() + theme_bw()
 
 forage %>% filter(exp=="for_controls") %>% ggplot(aes(x=plate,y=plate_reader_value,group=plate,color=as.factor(expected_value))) + geom_boxplot() + theme_bw() + facet_wrap(.~sample)
@@ -125,43 +126,5 @@ calc_df_2 %>% ggplot(aes(x=numbering,y=feeding_rate)) + geom_point() + theme_cla
 calc_df_summary <- calc_df_2 %>% group_by(plate) %>% summarize(mean=mean(feeding_rate),se=sd(feeding_rate)/sqrt(n())) 
 ggplot(calc_df_summary,aes(x=plate,y=mean))+geom_point()+geom_errorbar(aes(ymin=mean-se,ymax=mean+se),width=0.1) + theme_classic() + geom_hline(yintercept = 0)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#match control mean with plate treatment
-map = setNames(summary_df$control_mean,summary_df$plate_control)
-df$control_mean <- map[as.character(df$plate_treatment)]
-
-#calculate feeding rate rate
-#### df$fr_sw = log(df$control_mean/df$fluor_reading) * (v/t)
-
-# define volume and time
-v <- 
-  t <-
-  
-  df$fr_sw <- ifelse(df$experiment == "V1",log(df$control_mean/df$fluor_reading) * (v/t),
-                     log(df$control_mean/df$fluor_reading) * (v/t))
-
-
-#mean fluor reading per animal 
-animal_mean <- df%>%
-  filter(fr_sw > 0) %>% # remove negative feeding rates
-  group_by(genotype_numeric, plate_treatment, animal) %>%
-  summarise(mean_fluor_animal = mean(fr_sw, na.rm = TRUE))
-animal_mean
 
 
