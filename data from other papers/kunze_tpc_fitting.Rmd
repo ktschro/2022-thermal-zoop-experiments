@@ -1,0 +1,111 @@
+---
+title: "Kunze paper data re-work"
+author: "Katie Schroeder"
+date: "2023-04-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data availability.   
+Data were pulled from Kunze et al. (2022) *eLife* paper titled "Alternate patterns of temperature variation bring about very different disease outcomes at different mean temperatures."    
+
+All data are available on GitHub page. User: charlyknz in HostParasite repository.  
+
+## Purpose of this analysis.  
+Revisit the data collected in this experiment and determine if any of the rates can be calculated via rate summation/nonlinear averaging.
+
+## Step 1: load in data and necessary libraries.  
+```{r libraries and data loading in}
+library(tidyverse)
+library(magrittr)
+library(ggpubr) #for ggerrorplot
+
+spore<-read.csv("data from other papers/Kunze et al 2022/SporesNoMaleNA.csv")
+spore %<>% filter(treatment!="PULSE") #remove the pulse treatments from the dataframe. Only interested in constant and fluctuating temperatures
+spore %<>% filter(comment=="") #removes commented samples - many killed by pipette, otherwise not reliable 
+
+```
+
+## Spore data frame characteristics:  
+treatment is either fluctuating (FLU) or constant (CS).  
+exposed is either U (uninfected/unexposed) or I (infected/exposed).  
+all fluctuations were +/- 3 deg C every 12 hours.  
+temperature info: have temperature, mean temperature, real mean temperature (from HOBO)  
+death day: format %d/%m/%Y.  
+infect: 0 or 1 on whether Daphnia were infected.  
+no_spore: number of spores inside the host upon death - exclude before day 11, only include last day of experiment in paper.  
+
+## Step 2: look at growth rate.  
+```{r}
+#to get growth rate, first need to calculate lifespan (assume birthday is 4/10)
+spore %<>% mutate(birthday = "09/04/2019",
+                 lifespan = as.double(as.Date(death,'%d/%m/%Y')-as.Date(birthday,'%d/%m/%Y')),
+                 growth_rate = size/lifespan)
+
+#graph out growth rate at each temperature, separating fluctuating and constant treatments
+#filter out those younger than 26, when measurements began
+spore %>% filter(lifespan >=25) %>% ggplot(aes(x=meantemp,y=growth_rate,color=treatment,group=treatment)) + geom_point() + theme_bw()
+
+#summarize w/ error bars
+ggerrorplot(spore,x="meantemp",y="growth_rate",desc_stat="mean_se",color="treatment",palette="Paired",facet.by="infect")
+```
+## Fit a beta function and see if it predicts growth rate.  
+```{r}
+library(rTPC)
+library(nls.multstart)
+library(broom)
+
+#separate into uninfected and infected for the constant
+uninf <- spore %>% filter(infect==0)
+inf <- spore %>% filter(infect==1)
+
+#filter out samples without a growth rate and only look at constant uninfected samples
+d <- uninf %>% filter(treatment=="CS"&growth_rate>=0) %>% mutate(temp = meantemp, rate=growth_rate)
+
+betafit<- nls_multstart(rate~beta_2012(temp = temp, a, b, c, d, e),
+              data = d,
+              iter = c(6,6,6,6,6),
+              start_lower = get_start_vals(d$temp, d$rate, model_name = 'beta_2012') - 10,
+              start_upper = get_start_vals(d$temp, d$rate, model_name = 'beta_2012') + 10,
+              lower = get_lower_lims(d$temp, d$rate, model_name = 'beta_2012'),
+              upper = get_upper_lims(d$temp, d$rate, model_name = 'beta_2012'),
+              supp_errors = 'Y',
+              convergence_count = FALSE)
+
+new_data_beta <- data.frame(temp = seq(min(d$meantemp), max(d$meantemp), 0.1))
+preds_beta <- augment(betafit, newdata = new_data_beta)
+
+#graph
+ggplot(d,aes(meantemp,growth_rate)) +
+  geom_point() +
+  geom_line(data=preds_beta,aes(x=temp,y=.fitted),color='skyblue')+
+  theme_classic() 
+
+#manipulate the beta functions predicted values to get a dataframe that can be used to fit Jensen-esque line
+beta_preds <- preds_beta %>% filter(temp=="10"|temp=="13"|temp=="16"|temp=="19"|temp=="22"|temp=="25"|temp=="28")
+```
+
+
+```{r}
+
+sloperify <- function(i, j){
+  m <- (beta_preds$.fitted[j] - beta_preds$.fitted[i])/(beta_preds$temp[j] - beta_preds$temp[i])
+  b <- -m * beta_preds$temp[i] + beta_preds$.fitted[i]
+  mid <- (beta_preds$temp[j] - beta_preds$temp[i])/2 + beta_preds$temp[i]
+  y <- m * mid + b
+  return(y)
+}
+
+sloperify <- function(i, j, k, l){
+  m <- (j - i)/(k - l)
+  b <- -m * l + i
+  mid <- (beta_preds$temp[j] - beta_preds$temp[i])/2 + beta_preds$temp[i]
+  y <- m * mid + b
+  return(y)
+}
+
+```
+

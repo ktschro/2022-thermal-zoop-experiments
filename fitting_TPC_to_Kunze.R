@@ -35,32 +35,7 @@ library(broom)
 tpc <- uninf %>% filter(treatment == "CS")
 ggplot(tpc,aes(meantemp,growth_rate)) + geom_point() + theme_bw() 
 
-mod = 'sharpeschoolhigh_1981'
-
-#start values and limits
-start_vals <- get_start_vals(tpc$meantemp, tpc$growth_rate, model_name = 'sharpeschoolhigh_1981')
-low_lims <- get_lower_lims(tpc$meantemp, tpc$growth_rate, model_name = 'sharpeschoolhigh_1981')
-upper_lims <- get_upper_lims(tpc$meantemp, tpc$growth_rate, model_name = 'sharpeschoolhigh_1981')
-
-#fit model
-fit <- nls_multstart(growth_rate~sharpeschoolhigh_1981(temp = meantemp, r_tref,e,eh,th, tref = 20),
-                     data = tpc,
-                     iter = 500,
-                     start_lower = start_vals - 10,
-                     start_upper = start_vals + 10,
-                     lower = low_lims,
-                     upper = upper_lims,
-                     supp_errors = 'Y')
-
-#predict new data
-new_data <- data.frame(temp = seq(min(tpc$meantemp), max(tpc$meantemp), 18/91))
-preds <- augment(fit, newdata = new_data)
-
-#graph
-ggplot(tpc,aes(meantemp,growth_rate)) +
-  geom_point() +
-  geom_line(data=preds,aes(x=temp,y=.fitted),color='skyblue')+
-  theme_bw() 
+d <- tpc %>% mutate(temp = meantemp, rate=growth_rate)
 
 #fitting a quadratic ----
 quadfit<- nls_multstart(rate~quadratic_2008(temp = temp, a, b, c),
@@ -74,13 +49,34 @@ quadfit<- nls_multstart(rate~quadratic_2008(temp = temp, a, b, c),
                                      convergence_count = FALSE)
 
 new_data_quad <- data.frame(temp = seq(min(tpc$meantemp), max(tpc$meantemp), 18/91))
-preds_quad <- augment(fit, newdata = new_data_quad)
+preds_quad <- augment(quadfit, newdata = new_data_quad)
 
 #graph
 ggplot(d,aes(meantemp,growth_rate)) +
   geom_point() +
   geom_line(data=preds_quad,aes(x=temp,y=.fitted),color='skyblue')+
   theme_bw() 
+
+#fit beta ---- 
+betafit<- nls_multstart(rate~beta_2012(temp = temp, a, b, c, d, e),
+              data = d,
+              iter = c(6,6,6,6,6),
+              start_lower = get_start_vals(d$temp, d$rate, model_name = 'beta_2012') - 10,
+              start_upper = get_start_vals(d$temp, d$rate, model_name = 'beta_2012') + 10,
+              lower = get_lower_lims(d$temp, d$rate, model_name = 'beta_2012'),
+              upper = get_upper_lims(d$temp, d$rate, model_name = 'beta_2012'),
+              supp_errors = 'Y',
+              convergence_count = FALSE)
+
+new_data_beta <- data.frame(temp = seq(min(tpc$meantemp), max(tpc$meantemp), 18/91))
+preds_beta <- augment(betafit, newdata = new_data_beta)
+
+#graph
+ggplot(d,aes(meantemp,growth_rate)) +
+  geom_point() +
+  geom_line(data=preds_beta,aes(x=temp,y=.fitted),color='skyblue')+
+  geom_line(data=preds_quad,aes(x=temp,y=.fitted),color="blue")+
+  theme_classic() 
 
 #fit many models vignette - ----
 #For a single curve, we nest the dataframe, creating a list column which contains the temperature and rate values. We then create separate columns for each model fit using **purrr::map()**. Here, we use a gridstart approach when fitting models with **nls_multstart()**. This method creates a combination of start parameters, equally spaced across each of the starting parameter bounds. This can be specified with a vector of the same length as the number of parameters, c(5, 5, 5) for 3 estimated parameters will yield 125 iterations.
@@ -311,7 +307,7 @@ d_fits <- nest(d, data = c(temp, rate)) %>%
          #                                    supp_errors = 'Y',
          #                                    convergence_count = FALSE)))
 
-#This gives us a dataframe with our grouping variables `curve_id`, `growth_temp`, `process`, and `flux` first (not used here, but demonstrate how this can be scaled to multiple curves). Next is our `data` column which contains our temperature and rate data. Then is a column for each of our models.
+#This gives us a data frame with our grouping variables `curve_id`, `growth_temp`, `process`, and `flux` first (not used here, but demonstrate how this can be scaled to multiple curves). Next is our `data` column which contains our temperature and rate data. Then is a column for each of our models.
 
 glimpse(select(d_fits, 1:7))
 
