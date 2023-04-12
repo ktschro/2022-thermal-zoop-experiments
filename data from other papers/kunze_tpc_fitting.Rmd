@@ -23,9 +23,9 @@ library(tidyverse)
 library(magrittr)
 library(ggpubr) #for ggerrorplot
 
-spore<-read.csv("data from other papers/Kunze et al 2022/SporesNoMaleNA.csv")
+spore <- read_csv("Kunze et al 2022/SporesNoMaleNA.csv")
 spore %<>% filter(treatment!="PULSE") #remove the pulse treatments from the dataframe. Only interested in constant and fluctuating temperatures
-spore %<>% filter(comment=="") #removes commented samples - many killed by pipette, otherwise not reliable 
+spore %<>% filter(is.na(comment)) #removes commented samples - many killed by pipette, otherwise not reliable 
 
 ```
 
@@ -40,7 +40,7 @@ no_spore: number of spores inside the host upon death - exclude before day 11, o
 
 ## Step 2: look at growth rate.  
 ```{r}
-#to get growth rate, first need to calculate lifespan (assume birthday is 4/10)
+#to get growth rate, first need to calculate lifespan (assume birthday is 4/09)
 spore %<>% mutate(birthday = "09/04/2019",
                  lifespan = as.double(as.Date(death,'%d/%m/%Y')-as.Date(birthday,'%d/%m/%Y')),
                  growth_rate = size/lifespan)
@@ -86,6 +86,25 @@ ggplot(d,aes(meantemp,growth_rate)) +
 
 #manipulate the beta functions predicted values to get a dataframe that can be used to fit Jensen-esque line
 beta_preds <- preds_beta %>% filter(temp=="10"|temp=="13"|temp=="16"|temp=="19"|temp=="22"|temp=="25"|temp=="28")
+
+expected_rates
+
+write.csv(beta_preds,"beta_preds.csv")
+
+```
+
+## Try to do some nonlinear averaging.  
+```{r}
+#extract parameters
+co <- as.data.frame(coef(summary(betafit)))
+a <- co$Estimate[1]
+b <- co$Estimate[2]
+c <- co$Estimate[3]
+d <- co$Estimate[4]
+e <- co$Estimate[5]
+
+#write function
+
 ```
 
 
