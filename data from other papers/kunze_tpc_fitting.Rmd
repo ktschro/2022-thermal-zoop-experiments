@@ -87,23 +87,35 @@ ggplot(d,aes(meantemp,growth_rate)) +
 #manipulate the beta functions predicted values to get a dataframe that can be used to fit Jensen-esque line
 beta_preds <- preds_beta %>% filter(temp=="10"|temp=="13"|temp=="16"|temp=="19"|temp=="22"|temp=="25"|temp=="28")
 
-expected_rates
-
 write.csv(beta_preds,"beta_preds.csv")
 
-```
+#get summary info on growth rate so that we can compare fitted to estimates
+spore_sum <- spore %>% filter(growth_rate>=0) %>% group_by(meantemp,treatment,infect) %>% 
+  summarize(mean_growthrate = mean(growth_rate),
+            count = n(),
+            se_growthrate = sd(growth_rate)/sqrt(count))
 
-## Try to do some nonlinear averaging.  
-```{r}
-#extract parameters
-co <- as.data.frame(coef(summary(betafit)))
-a <- co$Estimate[1]
-b <- co$Estimate[2]
-c <- co$Estimate[3]
-d <- co$Estimate[4]
-e <- co$Estimate[5]
+spore_sum_sum <- spore_sum %>% filter(treatment == "FLU" & infect ==0)
 
-#write function
+#build new df
+estimates <- data.frame(temp1 = c(10,13,16,19,22),
+                        fitted1 = c(beta_preds$.fitted[1],beta_preds$.fitted[2],beta_preds$.fitted[3],beta_preds$.fitted[4],beta_preds$.fitted[5]),
+                        temp2 = c(16,19,22,25,28),
+                        fitted2 = c(beta_preds$.fitted[3],beta_preds$.fitted[4],beta_preds$.fitted[5],beta_preds$.fitted[6],beta_preds$.fitted[7]),
+                        fluct = c(13,16,19,22,25),
+                        actual = spore_sum_sum$mean_growthrate,
+                        actual_se = spore_sum_sum$se_growthrate,
+                        actual_count = spore_sum_sum$count)
+
+estimates %<>% mutate(midpoint = (fitted1+fitted2)/2)
+
+estimates %>% ggplot(aes(x=fluct,y=actual)) + 
+  geom_point() + 
+  geom_point(aes(x=fluct,y=midpoint),color="blue") + 
+  geom_errorbar(aes(ymin=actual-actual_se,ymax=actual+actual_se),width=0.1) + 
+  geom_line(data=preds_beta,aes(x=temp,y=.fitted),color='skyblue')+
+  theme_classic() 
+
 
 ```
 
