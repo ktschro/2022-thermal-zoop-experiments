@@ -3,9 +3,8 @@ plate$plate<-as.factor(plate$plate)
 
 library(tidyverse)
 library(ggpubr)
-library(ggplot2)
 
-plate %>% ggerrorplot(x="conc_ank",y="reading_485_665",desc_stat="mean_sd",facet.by = "plate")
+plate %>% ggerrorplot(x="conc_ank",y="reading_485_665",desc_stat="mean_se",facet.by = "plate")
 
 plate %>% ggplot(aes(x=conc_ank,y=reading_485_665,group=conc_ank)) + theme_classic() + geom_boxplot() +facet_wrap(.~plate)
 
@@ -23,3 +22,5 @@ summary(m1)
 plate_2$pred_fluor <- fitted(m1)
 
 ggplot(data=plate_2,aes(x=conc_ank,y=reading_485_665)) +geom_point()+geom_line(aes(x=conc_ank,y=pred_fluor))+theme_classic()
+
+summary(m1)

@@ -1,0 +1,17 @@
+nr.,meanTemp,treatment
+1,10.71,constant
+2,13.54,constant
+3,16.08,constant
+4,19.18,constant
+5,21.65,constant
+6,24.49,constant
+7,27.13,constant
+8,12.39,fluctuation
+9,15.95,fluctuation
+10,18.65,fluctuation
+11,21.45,fluctuation
+12,24.13,fluctuation
+13,13.91,pulse
+14,16.48,pulse
+15,19.59,pulse
+16,22.35,pulse
