@@ -30,7 +30,7 @@ library(lubridate)
 Reading in data
 Most recent copies of data live in the drive - links in the experiment protocol. YSI data lives in Dropbox.
 ```{r, message = F}
-setwd("~/Documents/GitHub/2022-thermal-zoop-experiments/raw-tank-data")
+setwd("/Users/katieschroeder/Documents/GitHub/2022-thermal-zoop-experiments/raw-data/tank-expt")
 meta <- read.csv("tank_metadata.csv")
 counts <- read.csv("tank_counts.csv")
 ysi <- read_csv("tank_ysi.csv")
@@ -81,6 +81,24 @@ data %<>% mutate(total = rowSums(across(juvenile_daphnia_uninf:cerio_inf),na.rm=
                  d_ratio = daphnia/total,
                  juveniles = juvenile_daphnia_inf+juvenile_daphnia_uninf,
                  j_ratio = juveniles/daphnia)
+
+#total zoop for ESA
+total_summary <- data %>% filter(community=="DCM"|community=="DM") %>%
+  group_by(temp,sample_date) %>% summarize(total = mean(total,na.rm=TRUE),
+                                           se = sd(total)/sqrt(n()))
+
+ggplot(data=filter(data,community=="DCM"|community=="DM"),aes(x=sample_date,y=total))+ 
+  geom_point(color="lightgrey") +
+  geom_line(aes(group = bucket),color="lightgrey") + 
+  geom_point(data=total_summary,color="black") + 
+  geom_line(data=total_summary,color="black")+
+  scale_color_discrete() + 
+  facet_wrap(~temp,nrow=1) +
+  theme_classic() + 
+  ylab("Population Size (# of zoops") +
+  theme(text = element_text(size = 20),legend.position="none")+
+  xlab("Sampling Date")
+
 #Time to try and get days between sample date and the start date
 data %<>% mutate(days_since_hosts_added = as.Date(sample_date)-as.Date(zoop_date),
                  days_since_spores_added = as.Date(sample_date)-as.Date(spore_date))
@@ -148,6 +166,34 @@ ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_u
 ```{r}
 ggplot(data,aes(x=sample_date,y=daphnia_inf, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Daphnia Inf Individuals (log scale)") + ggtitle("Daphnia I") + scale_y_continuous(trans='log10')
 
+#for ESA:combining DM, DCM
+data %<>% mutate(temp = if_else(temp=="var","Fluctuating",temp))
+
+data %>% filter(bucket == "20" | bucket == "53" | bucket == "44" | bucket == "63") %>%
+  ggplot(aes(x=sample_date,y=daphnia_inf))+ 
+  geom_point(size=3) + 
+  geom_line(aes(group = bucket),size=1.5) + 
+  scale_color_discrete() + 
+  facet_wrap(.~temp) +
+  theme_classic() + 
+  ylab(expression('Number of Infected'~italic(Daphnia))) + 
+  xlab("Sample date")+
+  theme(text = element_text(size = 20),legend.position="none")
+ggsave("inf_over_time.png",dpi=500,height=7.5,width=13,units="in")
+
+data %>% filter(bucket == "20" | bucket == "53" | bucket == "44" | bucket == "63") %>%
+  ggplot(aes(x=sample_date,y=daphnia_inf))+ 
+  geom_point(size=3) + 
+  geom_line(aes(group = bucket),size=1.5) + 
+  scale_color_discrete() + 
+  facet_wrap(.~temp) +
+  theme_classic() + 
+  ylab(expression('Number of Infected'~italic(Daphnia))) + 
+  xlab("Sample date")+
+  theme(text = element_text(size = 20),legend.position="none") +
+  geom_area(fill="seagreen3")
+ggsave("inf_over_time_shade.png",dpi=500,height=7.5,width=13,units="in")
+
 ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_inf, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Cerio Inf Individuals (log scale)") + ggtitle("Cerio I") + scale_y_continuous(trans='log10')
 
 #Cerio density vs cerio inf
@@ -156,7 +202,31 @@ ggplot(filter(data,community=="CM"&daphnia<=3),aes(x=cerio,y=cerio_inf,color=tem
 
 ####Prevalence
 ```{r,message=FALSE,warning=FALSE}
-ggplot(data,aes(x=sample_date,y=daphnia_prev, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Daphnia Inf Prev (log scale)") + ggtitle("Daphnia Prev")
+data %>% filter(community=="DCM"|community=="DM") %>%
+ggplot(aes(x=sample_date,y=daphnia_prev))+ 
+  geom_point() + 
+  geom_line(aes(group = bucket)) + 
+  scale_color_discrete() + 
+  facet_wrap(~temp,nrow=1) +
+  theme_classic() + 
+  ylab("Infection Prevalence") +
+  xlab("Sampling Date")
+
+prev_summary <- data %>% filter(community=="DCM"|community=="DM") %>%
+  group_by(temp,sample_date) %>% summarize(daphnia_prev = mean(daphnia_prev,na.rm=TRUE),
+                                           se = sd(daphnia_prev)/sqrt(n()))
+
+ggplot(data=filter(data,community=="DCM"|community=="DM"),aes(x=sample_date,y=daphnia_prev))+ 
+  geom_point(color="lightgrey") +
+  geom_line(data=data,aes(group = bucket),color="lightgrey") + 
+  geom_point(data=prev_summary,color="black") + 
+  geom_line(data=prev_summary,color="black")+
+  scale_color_discrete() + 
+  facet_wrap(~temp,nrow=1) +
+  theme_classic() + 
+  ylab("Infection Prevalence") +
+  theme(text = element_text(size = 20),legend.position="none")+
+  xlab("Sampling Date")
 
 ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_prev, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Cerio Inf Prev (log scale)") + ggtitle("Cerio Prev")
 ```
@@ -240,8 +310,17 @@ for (i in 1:length(buckets)){
 #making the epidemic_size_df nicer to work with
 epidemic_size_df %<>% rename(bucket = bucket....buckets) 
 
+#ESA figure
+epidemic_size_df %>% filter(community=="DM"|community=="DCM") %>% filter(epidemic_size_ind>10) %>% ggplot(aes(x=temp,y=epidemic_size_ind)) + 
+  geom_boxplot() + 
+  labs(x="Temperature Treatment",y="Total Epidemic Size (Number Infected)") + 
+  geom_jitter(shape = 16, position =position_jitter(0.1),alpha=0.3)+theme_classic()
+
 #raw data
-ggplot(filter(epidemic_size_df,community!="CM"),aes(x=temp,y=epidemic_size,color=temp))+geom_point()+facet_wrap(.~community)+theme_bw()
+ggplot(filter(epidemic_size_df,community!="CM"),aes(x=temp,y=epidemic_size,color=temp))+
+  geom_point()+
+  facet_wrap(.~community)+
+  theme_bw()
 ggplot(filter(epidemic_size_df,community!="CM"),aes(x=temp,y=epidemic_size_ind,color=temp))+geom_point()+facet_wrap(.~community)+theme_bw()
 
 #summarized epidemic data
