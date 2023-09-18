@@ -1,0 +1,134 @@
+---
+  title: "Untitled"
+author: "Andrew W. Park"
+date: '2023-04-07'
+output: html_document
+---
+  
+  ```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Let's make a model!
+
+$$
+  \begin{aligned}
+\frac{dS}{dt}&=ef A(S+I)-d S - \beta S Z\\
+\frac{dI}{dt}&=\beta SZ-d_{i}I\\
+\frac{dZ}{dt}&=d_{i}I\sigma_{max}(\frac{A}{A+h})-mZ -f(S+I)Z\\
+\frac{dA}{dt}&=r_{A}A(1-\frac{A}{K_{A}})-f(S+I)A
+\end{aligned}
+$$
+### What do each of these variables mean?   
+S = susceptible Daphnia
+I = infected Daphnia 
+Z = metsch spores 
+A = ank algae
+e = conversion efficiency 
+f = foraging rate
+d = death rate of uninfected Daphnia
+di = death rate of infected Daphnia
+Beta = transmission parameter
+sigma max = maximum spore yield
+h = half-saturation constant of algae growth
+m = spore loss rate 
+rA = algal specific growth rate  
+KA = algal carrying capacity
+
+
+### Which of these things vary with temperature? 
+$$
+ \begin{align}
+f(T,L) &= L^{\gamma}\cdot f_R \cdot e^{T_A([1/T_R]-[1/T])} \\
+\beta_{adult}(T)&=\beta_R \cdot e^{T_A([1/T_R]-[1/T])} \\
+u &= \frac{\beta_{adult}}{f_{adult}}\\
+\beta_{pop} &= u \cdot f_{pop} \\
+d(T) &= d_R \cdot e^{T_A([1/T_R]-[1/T])}\\
+d_i(T) &= d_{iR} \cdot e^{T_A([1/T_R]-[1/T])}\\
+r(T) &= r_R \cdot e^{T_A([1/T_R]-[1/T])}\\
+b &= r+d\\
+e &= \frac{b}{f \cdot A}\\
+\sigma_{max}(T) &=\alpha_2 \cdot T^2+\alpha_1 \cdot T + \alpha_0\\
+r_A(T) &= c e^{(A-\frac{E_a}{R}\cdot \frac{1}{T})}\\
+K_A(T) &= c(\alpha_1 \cdot T+\alpha_0)\\
+\end{align}
+$$
+Assumed to not be dependent on temperature: m and h
+ 
+```{r, libload}
+library(tidyverse)
+library(magrittr)
+library(deSolve)
+```
+
+
+
+```{r defineModel}
+
+sirMod = function(t, y, params){
+  S = y[1]
+  I = y[2]
+  R = y[3]
+  
+  
+  with(as.list(params),{
+    dS = lambda - mu*S - beta*S*I
+    dI = beta*S*I - mu*I - gamma*I
+    dR = gamma*I - mu*R 
+    
+    res=c(dS, dI, dR)
+    list(res)
+  }
+  )
+}
+
+```
+
+```{r defineParams}
+times  = seq(0, 10, by=1/100)
+params  = c(lambda=1000.0, mu=1.0, beta=0.02, gamma=12.0)
+start = c(S = 500, I = 1, R = 0)
+```
+
+
+
+
+```{r calcR0}
+R0 <- (params["beta"]*params["lambda"]/params["mu"])/(params["mu"]+params["gamma"])
+```
+
+
+
+```{r runModel}
+out <- as.data.frame(ode(start, times, sirMod, params))
+```
+
+```{r plotDyn}
+q <- out %>% pivot_longer(.,2:4,names_to="stateVar",values_to="size")
+q %>% dplyr::filter(time<10) %>% ggplot(.,aes(x=time,y=size,col=stateVar))+geom_line()+theme_classic()
+```
+
+```{r loopParams}
+myBetas <- seq(0.01,0.1,0.01)
+myGammas <- seq(52.0,12.0,length.out=10) #from 1 week to one month
+
+eq <- tibble(beta=numeric(0),gamma=numeric(0),eqPrev=numeric(0),R0=numeric(0))
+
+for (i in 1:length(myBetas)){
+  for (j in 1:length(myGammas)){
+    params["beta"] <- myBetas[i]
+    params["gamma"] <- myGammas[j]
+    R0 <- (params["beta"]*params["lambda"]/params["mu"])/(params["mu"]+params["gamma"])
+    R0 <- unname(R0)
+    R0 <- as.numeric(format(R0,digits=2))
+    out2 <- as.data.frame(ode(start, times, sirMod, params))
+    eqPrev <- out2 %>% slice(n()) %>% mutate(p=I/(S+I+R)) %>% pull(p)
+    eq %<>% add_case(beta=myBetas[i],gamma=myGammas[j],eqPrev=eqPrev,R0=R0)
+  }
+}
+
+#plot
+eq %>% ggplot(.,aes(x=beta,y=gamma))+geom_tile(color="black",aes(fill=eqPrev))+scale_fill_gradient(low="white",high="red")+geom_text(aes(label=R0),color="black",size=4)+theme_minimal()
+
+```
+
