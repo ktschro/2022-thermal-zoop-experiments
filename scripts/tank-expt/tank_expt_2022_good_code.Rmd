@@ -403,7 +403,29 @@ data %>% filter(community=="DCM") %>% ggplot(., aes(x=sample_date,y=d_ratio, col
 For Jenavier, how do D to C ratios vary in var vs constant 20C temp buckets?
 ```{r}
 #D to C ratio graph for all temperature DCM buckets
-ggplot(filter(summary,community=="DCM"),aes(x=temp,y=mean_d_ratio,color=temp))+geom_point()+geom_pointrange(aes(ymin=mean_d_ratio-se_d_ratio,ymax=mean_d_ratio+se_d_ratio))+facet_wrap(.~sample_date,nrow=1)+theme_bw()+xlab("Treatment")+ylab("Mean ratio of Daphnia to Ceriodaphnia")
+ggplot(filter(summary,community=="DCM"),aes(x=sample_date,y=mean_d_ratio,color=temp))+
+  geom_point()+
+  geom_pointrange(aes(ymin=mean_d_ratio-se_d_ratio,ymax=mean_d_ratio+se_d_ratio))+
+  theme_classic()+
+  facet_wrap(~temp)+
+  xlab("Treatment")+
+  ylab("Mean ratio of Daphnia to Ceriodaphnia")
+
+ggplot(filter(data,community=="DCM"),aes(x=sample_date,y=d_ratio,color=temp,group=bucket))+
+  geom_point()+
+  geom_line() +
+  theme_classic()+
+  facet_wrap(~temp)+
+  xlab("Treatment")+
+  ylab("Ratio of Daphnia to Ceriodaphnia")
+
+ggplot(filter(summary,community=="DCM"),aes(x=sample_date,y=mean_d_ratio,color=temp))+
+  geom_point()+
+  geom_pointrange(aes(ymin=mean_d_ratio-se_d_ratio,ymax=mean_d_ratio+se_d_ratio))+
+  theme_classic()+
+  facet_wrap(~temp)+
+  xlab("Treatment")+
+  ylab("Mean ratio of Daphnia to Ceriodaphnia")
 
 #D to C ratio graph for just the 20 and var DCM buckets
 #ggplot(filter(summary,community=="DCM"&(temp=="20"|temp=="var")),aes(x=temp,y=mean_d_ratio,color=temp))+geom_pointrange(aes(ymin=mean_d_ratio-se_d_ratio,ymax=mean_d_ratio+se_d_ratio))+facet_wrap(.~sample_date,nrow=1)+theme_bw()+xlab("Treatment")+ylab("Mean ratio of Daphnia to Ceriodaphnia")
