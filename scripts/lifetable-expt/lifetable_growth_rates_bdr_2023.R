@@ -6,6 +6,7 @@ library(bbmle)
 library(tidyverse)
 library(magrittr)
 library(lubridate)
+
 life <- read.csv("Library/CloudStorage/OneDrive-SharedLibraries-UniversityofGeorgia/Strauss Lab OSE - Shared Files/Strauss Lab Sharing/Data/Lab Experiments/Life Table Spring 2022 (Suh and Schroeder)/main_fitness_edit.csv")
 
 #calculate lifespan, get treatment IDs ---- 
@@ -94,7 +95,7 @@ for (j in 1:length(treatments)){
   # of j and go through the inside of the loop line by line to figure out what is wrong
   
   trtdata <- life[life$ID==treatments[j],]
-  # subset the data so you are just looking at clone j. this will get copied over each time
+  # subset the data so you are just looking at trt j. this will get copied over each time
   S.data <- trtdata 
   
   little.r.calculator(rdat=S.data) # this function saves r to global environment
@@ -162,6 +163,15 @@ lt.summary_factors$temp_var <- as.factor(lt.summary_factors$temp_var)
 saveRDS(lt.summary_factors,"Documents/GitHub/2022-thermal-zoop-experiments/processed-data/lifetable-expt/rates_bdr.rds")
 
 # Graphing ---- 
+lt.summary_factors %<>% 
+  mutate(magnitude = case_when(
+  temp_var == "2" ~ "1",
+  temp_var == "6" ~ "3",
+  temp_var == "14" ~ "7",
+  TRUE ~ "0"
+),
+  temp_var_inf = paste(temp_var,inf_status,sep="_"))
+  
 #little r, intrinsic growth rate
 lt.summary_factors %>% filter(species=="daphnia"&resource=="1") %>% 
   ggplot(.,aes(x=mean_temp,y=S.r,color=temp_var)) + 
@@ -172,16 +182,20 @@ lt.summary_factors %>% filter(species=="daphnia"&resource=="1") %>%
   facet_wrap(.~inf_status) +
   ylab("Intrinsic growth rate") + xlab("Mean temperature (°C)") +
   scale_x_continuous(breaks = c(15,20,25))
+ggsave("Documents/GitHub/2022-thermal-zoop-experiments/figures/little_r_all_temps.png")
+
 #zoom in on mean 20
 lt.summary_factors %>% filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
-  ggplot(.,aes(x=mean_temp,y=S.r,color=temp_var)) + 
+  ggplot(.,aes(x=magnitude,y=S.r,color=temp_var)) + 
   geom_point(position=position_dodge(width=0.7)) + 
   geom_errorbar(aes(ymax=S.r.975,ymin=S.r.025),width=0,position=position_dodge(width=0.7)) +
   scale_color_manual("Amplitude of fluctuation (°C)", values = c("black", "lightgreen","green3","forestgreen")) + 
   theme_classic(base_size = 14) +
   facet_wrap(.~inf_status) +
-  ylab("Intrinsic growth rate") + xlab("Mean temperature (°C)") +
-  scale_x_continuous(breaks = c(20))
+  ylab("Intrinsic growth rate") + 
+  xlab("Amplitude of temperature fluctuation (°C)") +
+  theme(legend.position = "none")
+ggsave("Documents/GitHub/2022-thermal-zoop-experiments/figures/little_r_20_fluct.png")
 
 #b, birth rate
 lt.summary_factors %>% filter(species=="daphnia"&resource=="1") %>% 
@@ -193,17 +207,41 @@ lt.summary_factors %>% filter(species=="daphnia"&resource=="1") %>%
   facet_wrap(.~inf_status) +
   ylab("Birth rate") + xlab("Mean temperature (°C)") +
   scale_x_continuous(breaks = c(15,20,25))
-#zoom in on mean 20
-lt.summary_factors %>% filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
-  ggplot(.,aes(x=mean_temp,y=S.b,color=temp_var)) + 
-  geom_point(position=position_dodge(width=0.7)) + 
-  geom_errorbar(aes(ymax=S.b.975,ymin=S.b.025),width=0,position=position_dodge(width=0.7)) +
-  scale_color_manual("Amplitude of fluctuation (°C)", values = c("black", "lightgreen","green3","forestgreen")) + 
-  theme_classic(base_size = 14) +
-  facet_wrap(.~inf_status) +
-  ylab("Birth rate") + xlab("Mean temperature (°C)") +
-  scale_x_continuous(breaks = c(20))
 
+#zoom in on mean 20, no facet ----
+#birth rate
+lt.summary_factors %>% filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
+  ggplot(aes(x=magnitude,y=S.b,color=inf_status,shape=inf_status)) + 
+  geom_point(position=position_dodge(width=0.15),size=4) + 
+  geom_errorbar(aes(ymax=S.b.975,ymin=S.b.025),width=0,position=position_dodge(width=0.15),linewidth=1.5) +
+  scale_color_manual("Amplitude of fluctuation (°C)", values = c("red3", "black")) + 
+  theme_classic(base_size = 20) +
+  ylab("Birth rate") + 
+  xlab("Amplitude of temperature fluctuation (°C)") + theme(legend.position = "none")
+ggsave("Documents/GitHub/2022-thermal-zoop-experiments/figures/birth_20_fluct.png")
+
+#death rate
+lt.summary_factors %>% filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
+  ggplot(aes(x=magnitude,y=S.d,color=inf_status,shape=inf_status)) + 
+  geom_point(position=position_dodge(width=0.1),size=4) + 
+  geom_errorbar(aes(ymax=S.d.975,ymin=S.d.025),width=0,position=position_dodge(width=0.1),linewidth=1.5) +
+  scale_color_manual("Amplitude of fluctuation (°C)", values = c("red3", "black")) + 
+  theme_classic(base_size = 20) +
+  ylab("Death rate") + 
+  xlab("Amplitude of temperature fluctuation (°C)") + theme(legend.position = "none")
+ggsave("Documents/GitHub/2022-thermal-zoop-experiments/figures/death_20_fluct.png")
+
+#little r
+lt.summary_factors %>% filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
+  ggplot(aes(x=magnitude,y=S.r,color=inf_status,shape=inf_status)) + 
+  geom_point(position=position_dodge(width=0.1),size=4) + 
+  geom_errorbar(aes(ymax=S.r.975,ymin=S.r.025),width=0,position=position_dodge(width=0.1),linewidth=1.5) +
+  scale_color_manual("Amplitude of fluctuation (°C)", values = c("red3", "black")) + 
+  theme_classic(base_size = 20) +
+  ylab("Intrinsic growth rate") + 
+  xlab("Amplitude of temperature fluctuation (°C)") + theme(legend.position = "none")
+ggsave("Documents/GitHub/2022-thermal-zoop-experiments/figures/little_r_20_fluct.png")
+  
 #d, death rate
 lt.summary_factors %>% filter(species=="daphnia"&resource=="1") %>% 
   ggplot(.,aes(x=mean_temp,y=S.d,color=temp_var)) + 
@@ -230,17 +268,35 @@ saveRDS(lt.summary_factors, file ="processed-data/lifetable-expt/lifetable_growt
 
 # graphing the difference in r between uninfected and infected groups, just 20 and var
 rates<-readRDS("processed-data/lifetable-expt/lifetable_growth_rates_w_CI_2022.rds")
+rates<-lt.summary_factors
 rates$temp_var<-as.factor(rates$temp_var)
 rates %>% filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
-  ggplot(.,aes(x=temp_var,y=S.r,color=inf_status)) + 
+  mutate(magnitude = case_when(
+    temp_var=="0" ~ 0,
+    temp_var=="2" ~ 1,
+    temp_var=="6" ~ 3,
+    temp_var=="14" ~ 7
+  )) %>%
+  ggplot(.,aes(x=magnitude,y=S.r,color=inf_status)) + 
   geom_point(position=position_dodge(width=0.1)) + 
   geom_errorbar(aes(ymax=S.r.975,ymin=S.r.025),width=0,position=position_dodge(width=0.1)) +
   scale_color_manual("Infection Status", values = c("red", "black")) + 
   theme_classic(base_size = 14) +
-  ylab("little r") + xlab("2*fluctuation amplitude (°C)") 
+  scale_x_continuous(breaks=c(0,1,3,7))+
+  ylab("little r") + xlab("Amplitude of temperature fluctuation (°C)") 
 
-rates_uninf <- rates %>% filter(inf_status=="U") %>% select(-c("S.d.975","S.d.025","S.b.975","S.b.025","S.r.975","S.r.025","resource","species","mean_temp","temp_var","temp_id")) %>% rename(ID_u = ID, S.r_u = S.r, S.d_u=S.d,S.b_u=S.b,inf = inf_status)
-rates_inf<- rates %>% filter(inf_status=="I") %>% select(-c("S.d.975","S.d.025","S.b.975","S.b.025","S.r.975","S.r.025"))
+rates %<>% filter(resource =="1" & 
+                    species == "daphnia" & 
+                    mean_temp=="20")
+rates %>% pivot_longer(cols = ,names_to = ,values_to=)
+
+rates_uninf <- rates %>% 
+  filter(inf_status=="U") %>% 
+  select(-c("S.d.975","S.d.025","S.b.975","S.b.025","S.r.975","S.r.025","resource","species","mean_temp","temp_var","temp_id")) %>% 
+  rename(ID_u = ID, S.r_u = S.r, S.d_u=S.d,S.b_u=S.b,inf = inf_status)
+rates_inf<- rates %>% 
+  filter(inf_status=="I") %>% 
+  select(-c("S.d.975","S.d.025","S.b.975","S.b.025","S.r.975","S.r.025"))
 
 rates_wide <- bind_cols(rates_inf,rates_uninf) 
 rates_wide %<>% mutate(diff_d = S.d - S.d_u,
@@ -250,18 +306,18 @@ rates_wide %<>% mutate(diff_d = S.d - S.d_u,
   pivot_longer(cols = starts_with("diff_"),names_to = "rate",names_prefix = "diff_",values_to = "diff")
 
 rates_wide %<>% 
-  #separate(ID,c('species','temp_ID','resource','idk'),sep="_") %>%
+  separate(ID,c('species','temp_ID','resource','idk'),sep="_") %>%
   mutate(temp_var = case_when(
-  temp_ID == "2V" ~ "2",
-  temp_ID == "6V" ~ "6",
-  temp_ID == "14V" ~ "14",
+  temp_ID == "2V" ~ "1",
+  temp_ID == "6V" ~ "3",
+  temp_ID == "14V" ~ "7",
   TRUE ~ "0"
 ))
 
-rates_wide %>% filter(resource =="1" & species == "daphnia" & (temp_ID != "15"&temp_ID !="20")) %>%
-  ggplot(.,aes(x=factor(temp_var,levels=c('0','2','6','14')),y=diff,color=rate,group=rate)) + 
+rates_wide %>% filter(resource =="1" & species == "daphnia" & (temp_ID != "15"&temp_ID !="25")) %>%
+  ggplot(.,aes(x=factor(temp_var,levels=c('0','1','3','7')),y=diff,color=rate,group=rate)) + 
   geom_point(size=4)+
   theme_classic(base_size = 14)+
-  ylab("difference in rate (inf-uninf)") + xlab("2*fluctuation amplitude (°C)")+facet_wrap(.~rate)
+  ylab("difference in rate (inf-uninf)") + xlab("Fluctuation amplitude (°C)")+facet_wrap(.~rate)
 
 

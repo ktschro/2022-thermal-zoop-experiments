@@ -83,21 +83,24 @@ data %<>% mutate(total = rowSums(across(juvenile_daphnia_uninf:cerio_inf),na.rm=
                  j_ratio = juveniles/daphnia)
 
 #total zoop for ESA
-total_summary <- data %>% filter(community=="DCM"|community=="DM") %>%
-  group_by(temp,sample_date) %>% summarize(total = mean(total,na.rm=TRUE),
+total_summary <- data %>% 
+  group_by(temp,sample_date,community) %>% summarize(total = mean(total,na.rm=TRUE),
                                            se = sd(total)/sqrt(n()))
 
-ggplot(data=filter(data,community=="DCM"|community=="DM"),aes(x=sample_date,y=total))+ 
+data %>% filter(community=="DM"|community=="D") %>%
+  filter(bucket!="30"&bucket!="26"&bucket!="23"&bucket!="22") %>%
+  ggplot(aes(x=sample_date,y=total))+ 
   geom_point(color="lightgrey") +
   geom_line(aes(group = bucket),color="lightgrey") + 
-  geom_point(data=total_summary,color="black") + 
-  geom_line(data=total_summary,color="black")+
+  geom_point(data=filter(total_summary,community=="DM"|community=="D"),color="black") + 
+  geom_line(data=filter(total_summary,community=="DM"|community=="D"),color="black")+
   scale_color_discrete() + 
-  facet_wrap(~temp,nrow=1) +
+  facet_grid(rows=vars(community),cols=vars(temp)) +
   theme_classic() + 
-  ylab("Population Size (# of zoops") +
+  ylab("Population Size (# of zoops)") +
   theme(text = element_text(size = 20),legend.position="none")+
-  xlab("Sampling Date")
+  xlab("Sampling Date")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 #Time to try and get days between sample date and the start date
 data %<>% mutate(days_since_hosts_added = as.Date(sample_date)-as.Date(zoop_date),
@@ -123,8 +126,25 @@ ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_u
 
 ####Now doing it all again on a log scale  
 ```{r,message=FALSE,warning=FALSE}
-ggplot(data,aes(x=sample_date,y=total, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + theme(legend.position = "none") + facet_grid(rows= vars(temp), cols = vars(community)) + theme_bw() + ylab("Total zoop density (log scale)") + ggtitle("Total Zoop") + scale_y_continuous(trans='log10')
-ggplot(data,aes(x=sample_date,y=daphnia, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Total Daphnia density (log scale)") + ggtitle("Daphnia") + scale_y_continuous(trans='log10')
+ggplot(data,aes(x=days_since_hosts_added,y=total))+ 
+  geom_point() + 
+  geom_line(aes(group = bucket)) + 
+  scale_color_discrete() + 
+  theme(legend.position = "none") + 
+  facet_grid(rows= vars(temp), cols = vars(community)) + 
+  theme_bw() + ylab("Total zoop density (log scale)") + 
+  ggtitle("Total Zoop") + scale_y_continuous(trans='log10')
+
+data %>%
+  filter(community!="CM") %>%
+  ggplot(aes(x=days_since_hosts_added,y=daphnia))+ 
+  geom_line(aes(group = bucket)) + 
+  geom_point(size=0.5)+
+  scale_color_discrete() + 
+  facet_grid(rows= vars(temp), cols = vars(community)) +
+  theme_bw() + ylab("Total Daphnia density (log scale)") + 
+  ggtitle("Daphnia") + scale_y_continuous(trans='log10')
+
 ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_uninf, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Total Cerio density (log scale)") + ggtitle("Cerio") + scale_y_continuous(trans='log10')
 ```
 ####Which buckets have bottomed out?
@@ -157,7 +177,9 @@ Var: 45-48
 ####Taking total density data and incorporating if any Daphnia or Ceriodaphnia were infected during that sampling
 ```{r}
 ggplot(filter(data,community!="CM"),aes(x=sample_date,y=daphnia, color=daphnia_inf_status))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Total Daphnia density") + ggtitle("Daphnia")
+
 ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_uninf, color=cerio_inf_status))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) +theme_bw() + ylab("Total Cerio density") + ggtitle("Cerio")
+
 #Can do color as continuous prevalence but it's harder to see which buckets had infections
 ```
 
@@ -215,6 +237,13 @@ ggplot(aes(x=sample_date,y=daphnia_prev))+
 prev_summary <- data %>% filter(community=="DCM"|community=="DM") %>%
   group_by(temp,sample_date) %>% summarize(daphnia_prev = mean(daphnia_prev,na.rm=TRUE),
                                            se = sd(daphnia_prev)/sqrt(n()))
+
+prev_summary %>% 
+ ggplot(aes(x=temp,y=daphnia_prev)) +
+  geom_boxplot(color="lightgrey") +
+  geom_point(size=2,color="black",alpha=2) +
+  theme_classic()
+
 
 ggplot(data=filter(data,community=="DCM"|community=="DM"),aes(x=sample_date,y=daphnia_prev))+ 
   geom_point(color="lightgrey") +
@@ -284,7 +313,11 @@ ggplot(filter(summary,community=="CM"|community=="DCM"),aes(x=sample_date,y=mean
 ###Epidemic Size - measuring area under the epidemic curve
 ```{r}
 #First visualize epidemics in each temperature and community treatment again - ignore CM for now
-data %>% filter(days_since_spores_added>=0&community!="CM") %>% ggplot(.,aes(x=days_since_spores_added,y=daphnia_prev,color=temp))+geom_point()+geom_line(aes(group = bucket)) + facet_grid(rows= vars(temp), cols = vars(community))+theme_bw()
+data %>% filter(days_since_spores_added>=0&community!="CM") %>% ggplot(.,aes(x=days_since_spores_added,y=daphnia_prev,color=temp))+
+  geom_point()+
+  geom_line(aes(group = bucket)) + 
+  facet_grid(rows= vars(temp), cols = vars(community))+
+  theme_bw()
 
 #To use trapz
 library(pracma)
@@ -524,3 +557,39 @@ ggplot(ysi_summ, aes(x=Date, y=do_per, color = temp)) + geom_point() + geom_line
 ggplot(ysi_summ, aes(x=Date, y=ph, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(pool), cols = vars(community))
 ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(pool), cols = vars(community))
 ```
+
+
+##Looking at density vs prevalence:  
+
+```{r}
+#plotting each time point (sampling) as a separate point with total density vs density
+data %>% filter(community!="CM") %>%
+  filter(daphnia_prev>0) %>%
+  mutate(bucket56 = ifelse(bucket=="56","56","not")) %>%
+  ggplot(aes(x=daphnia,y=daphnia_prev,color=bucket56)) +
+  geom_point() +
+  theme_classic() +
+  facet_wrap(~temp) +
+  ylab("Infection prevalence") + xlab("Total Daphnia density")
+
+#now with number of infected individuals
+data %>% filter(community!="CM") %>%
+  mutate(bucket56 = ifelse(bucket=="56","56","not")) %>%
+  filter(daphnia_prev>0) %>%
+  ggplot(aes(x=daphnia,y=daphnia_inf,color=bucket56)) +
+  geom_point() +
+  theme_classic() +
+  facet_wrap(~temp) +
+  ylab("Number of infected individuals") + xlab("Total Daphnia density")
+
+data %>% filter(community!="CM") %>%
+  mutate(bucket56 = ifelse(bucket=="56","56","not")) %>%
+  filter(daphnia_prev>0) %>%
+  ggplot(aes(x=daphnia_inf,y=daphnia_prev,color=bucket56)) +
+  geom_point() +
+  theme_classic() +
+  facet_wrap(~temp) +
+  ylab("Infection prevalence") + xlab("Number of infected Daphnia")
+
+```
+
