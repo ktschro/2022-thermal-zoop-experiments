@@ -69,11 +69,43 @@ total_summary$exp_day = as.double(difftime(
   total_summary$sample_date, ymd("2022-06-27"),units="days"))
 total_summary2$exp_day = as.double(difftime(
   total_summary2$sample_date, ymd("2022-06-27"),units="days"))
+data$exp_day = as.double(difftime(
+  data$sample_date, ymd("2022-06-27"),units="days"))
 
 #graph total ----
 total_summary %>%
   mutate(Temperature = ifelse(str_detect(temp,"var"),"Fluctuating",temp)) %>%
   filter(community=="D") %>%
+  ggplot(aes(x=exp_day,y=mean_total,group=temp,color=Temperature)) +
+  geom_point(size=0.5) +
+  geom_line(size=2) +
+  geom_errorbar(aes(ymin=mean_total-se_total,ymax=mean_total+se_total),
+                color="lightgrey",alpha=0.7,width=0.4,position=position_dodge(width=0.4))+
+  scale_y_continuous(trans="log10") +
+  scale_color_manual(values = c("#c5e1ef","#6cb0d6","#226e9c","#e05c5c")) +
+  theme_classic() +
+  ylab("Mean number of zooplankton") +
+  xlab("Day of experiment")+
+  theme(text = element_text(size=30))
+ggsave("figures/D_pop_over_time.png",dpi=500,height=7.5,width=13,units="in")
+
+#population over time for one bucket
+data %>%
+  filter(bucket=="1") %>%
+  ggplot(aes(x=exp_day,y=total)) +
+  geom_point(size=0.5) +
+  geom_line(size=2) +
+  theme_classic() +
+  ylab("Number of zooplankton") +
+  xlab("Day of experiment")+
+  ylim(0,320)+
+  geom_area(fill="coral")+
+  theme(text = element_text(size=30))
+ggsave("figures/bucket1_pop_over_time_filled.png",dpi=500,height=7.5,width=11,units="in")
+
+total_summary %>%
+  mutate(Temperature = ifelse(str_detect(temp,"var"),"Fluctuating",temp)) %>%
+  filter(community=="DM") %>%
   ggplot(aes(x=exp_day,y=mean_total,group=temp,color=Temperature)) +
   geom_point(size=0.5) +
   geom_line(size=2) +
@@ -137,8 +169,11 @@ for (i in 1:length(buckets)){
 }
 
 #summarize population size
+colnames(epidemic_size_df) [1] <- "bucket"
+
 population <- epidemic_size_df %>% 
-  filter(bucket!="30"&bucket!="26"&bucket!="23"&bucket!="22"&bucket!="63"&bucket!="64"&bucket=="56") %>% #excludes buckets that went to zero (22,23,26 and 30) and buckets that had a lot of ceriodaphnia (63 and 64)
+  filter(bucket!="30"&bucket!="26"&bucket!="23"&bucket!="22"&bucket!="63"&bucket!="64"&bucket!="56") %>%
+#excludes buckets that went to zero (22,23,26 and 30) and buckets that had a lot of ceriodaphnia (63 and 64)
   group_by(temp,community) %>%
   summarize(mean_pop = mean(population_size),
             se_pop = sd(population_size)/sqrt(n()),
@@ -162,7 +197,7 @@ population %>% filter(community=="DM"|community=="D") %>%
 population %>% filter(community=="DM") %>%
   mutate(Temperature = ifelse(str_detect(temp,"var"),"Fluctuating",temp)) %>%
   mutate(avg_pop = mean_pop/16,
-         se_avg_pop = se_pop/16)
+         se_avg_pop = se_pop/16) %>%
   ggplot(aes(x=Temperature,y=mean_pop,fill=Temperature)) +
   geom_bar(stat="identity") +
   theme_classic() +
@@ -172,7 +207,6 @@ population %>% filter(community=="DM") %>%
   scale_fill_manual(values = c("#c5e1ef","#6cb0d6","#226e9c","#e05c5c"))
 ggsave("figures/DM_pop_integrated.png",dpi=500,height=7.5,width=6,units="in")
 
-colnames(epidemic_size_df) [1] <- "bucket"
 epidemic_size_df %>% filter(community=="DM"|community=="DCM") %>%
   filter(bucket!="30"&bucket!="26"&bucket!="23"&bucket!="22"
            &bucket!="63"&bucket!="64"
@@ -187,6 +221,24 @@ epidemic_size_df %>% filter(community=="DM"|community=="DCM") %>%
   scale_fill_manual(values = c("#c5e1ef","#6cb0d6","#226e9c","#e05c5c"))+
   theme(text = element_text(size=30),legend.position="none")
 ggsave("figures/DM_DCM_pop_integrated_boxplot.png",dpi=500,height=9,width=7,units="in")
+
+epidemic_size_df %>% filter(community=="D") %>%
+  filter(bucket!="30"&bucket!="26"&bucket!="23"&bucket!="22"
+         &bucket!="63"&bucket!="64"
+  ) %>%
+  mutate(Temperature = ifelse(str_detect(temp,"var"),"Fluctuating",temp)) %>%
+  ggplot(aes(x=Temperature,y=population_size)) +
+  geom_boxplot(aes(fill=Temperature),alpha=0.9) +
+  geom_point(size=3,color="black",alpha=0.5,
+             position=position_dodge2(width=0.2))+
+  theme_classic() +
+  ylab("Total population over experiment")+
+  scale_fill_manual(values = c("#c5e1ef","#6cb0d6","#226e9c","#e05c5c"))+
+  theme(text = element_text(size=30),legend.position="none")
+ggsave("figures/D_pop_integrated_boxplot.png",dpi=500,height=9,width=7,units="in")
+
+#populataion over time graph for one bucket
+
 
 #now number of infected individuals
 total_summary %>%
@@ -313,4 +365,15 @@ epidemic_size_df %>% filter(temp=="20"|temp=="var") %>%
   ggplot(aes(x=population_size,epidemic_size,color=temp)) +
   geom_point(size=2.5) +
   xlim(2500,12000)+
+  theme_classic()
+
+data %>%
+  filter(bucket!="30"&bucket!="26"&bucket!="23"&bucket!="22"&
+         bucket!="63"&bucket!="64") %>%
+  filter(temp=="var"|temp=="20") %>%
+  filter(daphnia_prev>0) %>%
+  mutate(community2 = ifelse(community=="DM"|community=="DCM","Metsch","No Metsch"),
+         Temperature=ifelse(temp=="var","Fluctuating","Constant 20°C")) %>%
+  ggplot(aes(x=daphnia_inf,y=daphnia_prev,color=Temperature)) +
+  geom_point() +
   theme_classic()

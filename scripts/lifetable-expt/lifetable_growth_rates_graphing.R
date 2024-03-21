@@ -2,69 +2,123 @@
 setwd("~/")
 lt.summary_factors <- readRDS("Documents/GitHub/2022-thermal-zoop-experiments/processed-data/lifetable-expt/rates_bdr.rds")
 
+lt.summary_factors %<>% mutate(
+  amp = case_when(
+    temp_var=="0"~0,
+    temp_var=="2"~1,
+    temp_var=="6"~3,
+    temp_var=="14"~7,
+  ),
+  katie = case_when(
+    temp_var=="0"&species=="daphnia"&resource==1&inf_status=="U" ~ "uninf",
+    temp_var=="0"&species=="daphnia"&resource==1&inf_status=="I" ~ "inf",
+    TRUE ~ "ignore"
+  )
+)
+
 #little r, intrinsic growth rate
-lt.summary_factors %>% filter(species=="daphnia"&resource=="1") %>% 
+lt.summary_factors %>% 
+  filter(species=="daphnia"&resource=="1") %>% 
+  filter(inf_status=="U") %>%
+  #filter(temp_var=="0") %>%
   ggplot(.,aes(x=mean_temp,y=S.r,color=temp_var)) + 
-  geom_point(position=position_dodge(width=0.7)) + 
-  geom_errorbar(aes(ymax=S.r.975,ymin=S.r.025),width=0,position=position_dodge(width=0.7)) +
+  geom_point(position=position_dodge(width=0.7),size=2) + 
+  geom_errorbar(aes(ymax=S.r.975,ymin=S.r.025),width=0,position=position_dodge(width=0.7),size=1) +
   scale_color_manual("Amplitude of fluctuation (°C)", values = c("black", "lightgreen","green3","forestgreen")) + 
-  theme_classic(base_size = 14) +
-  facet_wrap(.~inf_status) +
-  ylab("Intrinsic growth rate") + xlab("Mean temperature (°C)") +
-  scale_x_continuous(breaks = c(15,20,25))
+  theme_classic(base_size = 20) +
+  #facet_wrap(.~inf_status) +
+  labs(x = "Mean Temperature (°C)", 
+       y = expression(paste("Intrinsic growth rate ", (day^-1)))) +
+  scale_x_continuous(breaks = c(15,20,25))+
+  theme(legend.position = "none")+
+  geom_smooth(data=subset(lt.summary_factors,katie=="uninf"),method=lm,formula = y ~ x + I(x^2),size=1.5,color=alpha("lightgrey",0.35),se=FALSE)
+ggsave("Documents/GitHub/2022-thermal-zoop-experiments/figures/lifetable_uninfect_r_all.png",width=7.5,height=7,units="in",dpi=300)
+  
 
 #zoom in on mean 20
-lt.summary_factors %>% filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
-  ggplot(.,aes(x=mean_temp,y=S.r,color=temp_var)) + 
-  geom_point(position=position_dodge(width=0.7)) + 
-  geom_errorbar(aes(ymax=S.r.975,ymin=S.r.025),width=0,position=position_dodge(width=0.7)) +
+lt.summary_factors %>% 
+  filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
+  filter(inf_status=="U") %>%
+  ggplot(aes(x=amp,y=S.r,color=temp_var)) + 
+  geom_point() +
+  geom_errorbar(aes(ymax=S.r.975,ymin=S.r.025),width=0) +
   scale_color_manual("Amplitude of fluctuation (°C)", values = c("black", "lightgreen","green3","forestgreen")) + 
-  theme_classic(base_size = 14) +
-  facet_wrap(.~inf_status) +
-  ylab("Intrinsic growth rate") + xlab("Mean temperature (°C)") +
-  scale_x_continuous(breaks = c(20))
+  theme_classic(base_size = 15) +
+  #facet_wrap(.~inf_status) +
+  scale_x_continuous(breaks = c(0,1,3,7))+
+  labs(x = "Magnitude of fluctuation (°C)", 
+       y = expression(paste("Intrinsic growth rate ", (day^-1)))) +
+  theme(legend.position = "none")
+ggsave("Documents/GitHub/2022-thermal-zoop-experiments/figures/lifetable_uninfect_r.png",width=3.7,height=5.5,units="in",dpi=300)
 
 #b, birth rate
-lt.summary_factors %>% filter(species=="daphnia"&resource=="1") %>% 
+lt.summary_factors %>% 
+  filter(species=="daphnia"&resource=="1") %>% 
+  filter(inf_status=="U") %>%
+  #filter(temp_var=="0") %>%
   ggplot(.,aes(x=mean_temp,y=S.b,color=temp_var)) + 
-  geom_point(position=position_dodge(width=0.7)) + 
-  geom_errorbar(aes(ymax=S.b.975,ymin=S.b.025),width=0,position=position_dodge(width=0.7)) +
+  geom_point(position=position_dodge(width=0.7),size=2) + 
+  geom_errorbar(aes(ymax=S.b.975,ymin=S.b.025),width=0,position=position_dodge(width=0.7),size=1) +
   scale_color_manual("Amplitude of fluctuation (°C)", values = c("black", "lightgreen","green3","forestgreen")) + 
-  theme_classic(base_size = 14) +
-  facet_wrap(.~inf_status) +
-  ylab("Birth rate") + xlab("Mean temperature (°C)") +
-  scale_x_continuous(breaks = c(15,20,25))
+  theme_classic(base_size = 20) +
+  #facet_wrap(.~inf_status) +
+  labs(x = "Mean Temperature (°C)", 
+       y = expression(paste("Birth rate ", (day^-1)))) +
+  scale_x_continuous(breaks = c(15,20,25))+
+  theme(legend.position = "none")+
+  geom_smooth(data=subset(lt.summary_factors,katie=="uninf"),method=lm,formula = y ~ x + I(x^2),size=1.5,color=alpha("lightgrey",0.35),se=FALSE)
+ggsave("Documents/GitHub/2022-thermal-zoop-experiments/figures/lifetable_uninfect_b_all.png",width=7.5,height=7,units="in",dpi=300)
+
 #zoom in on mean 20
-lt.summary_factors %>% filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
-  ggplot(.,aes(x=mean_temp,y=S.b,color=temp_var)) + 
-  geom_point(position=position_dodge(width=0.7)) + 
-  geom_errorbar(aes(ymax=S.b.975,ymin=S.b.025),width=0,position=position_dodge(width=0.7)) +
+lt.summary_factors %>% 
+  filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
+  filter(inf_status=="U") %>%
+  ggplot(aes(x=amp,y=S.b,color=temp_var)) + 
+  geom_point() +
+  geom_errorbar(aes(ymax=S.b.975,ymin=S.b.025),width=0) +
   scale_color_manual("Amplitude of fluctuation (°C)", values = c("black", "lightgreen","green3","forestgreen")) + 
-  theme_classic(base_size = 14) +
-  facet_wrap(.~inf_status) +
-  ylab("Birth rate") + xlab("Mean temperature (°C)") +
-  scale_x_continuous(breaks = c(20))
+  theme_classic(base_size = 15) +
+  #facet_wrap(.~inf_status) +
+  scale_x_continuous(breaks = c(0,1,3,7))+
+  labs(x = "Magnitude of fluctuation (°C)", 
+       y = expression(paste("Birth rate ", (day^-1)))) +
+  theme(legend.position = "none")
+ggsave("Documents/GitHub/2022-thermal-zoop-experiments/figures/lifetable_uninfect_b.png",width=3.7,height=5.5,units="in",dpi=300)
 
 #d, death rate
-lt.summary_factors %>% filter(species=="daphnia"&resource=="1") %>% 
+lt.summary_factors %>% 
+  filter(species=="daphnia"&resource=="1") %>% 
+  filter(inf_status=="U") %>%
+  #filter(temp_var=="0") %>%
   ggplot(.,aes(x=mean_temp,y=S.d,color=temp_var)) + 
-  geom_point(position=position_dodge(width=0.7)) + 
-  geom_errorbar(aes(ymax=S.d.975,ymin=S.d.025),width=0,position=position_dodge(width=0.7)) +
+  geom_point(position=position_dodge(width=0.7),size=2) + 
+  geom_errorbar(aes(ymax=S.d.975,ymin=S.d.025),width=0,position=position_dodge(width=0.7),size=1) +
   scale_color_manual("Amplitude of fluctuation (°C)", values = c("black", "lightgreen","green3","forestgreen")) + 
-  theme_classic(base_size = 14) +
-  facet_wrap(.~inf_status) +
-  ylab("Death rate") + xlab("Mean temperature (°C)") +
-  scale_x_continuous(breaks = c(15,20,25))
+  theme_classic(base_size = 20) +
+  #facet_wrap(.~inf_status) +
+  labs(x = "Mean Temperature (°C)", 
+       y = expression(paste("Death rate ", (day^-1)))) +
+  scale_x_continuous(breaks = c(15,20,25))+
+  theme(legend.position = "none")+
+  geom_smooth(data=subset(lt.summary_factors,katie=="uninf"),method=lm,formula = y ~ x + I(x^2),size=1.5,color=alpha("lightgrey",0.35),se=FALSE)
+ggsave("Documents/GitHub/2022-thermal-zoop-experiments/figures/lifetable_uninfect_d_all.png",width=7.5,height=7,units="in",dpi=300)
+
+
 #zoom in on mean 20
-lt.summary_factors %>% filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
-  ggplot(.,aes(x=mean_temp,y=S.d,color=temp_var)) + 
-  geom_point(position=position_dodge(width=0.2)) + 
-  geom_errorbar(aes(ymax=S.d.975,ymin=S.d.025),width=0,position=position_dodge(width=0.2)) +
+lt.summary_factors %>% 
+  filter(species=="daphnia"&resource=="1"&mean_temp=="20") %>% 
+  filter(inf_status=="U") %>%
+  ggplot(aes(x=amp,y=S.d,color=temp_var)) + 
+  geom_point() +
+  geom_errorbar(aes(ymax=S.d.975,ymin=S.d.025),width=0) +
   scale_color_manual("Amplitude of fluctuation (°C)", values = c("black", "lightgreen","green3","forestgreen")) + 
-  theme_classic(base_size = 14) +
-  facet_wrap(.~inf_status) +
-  ylab("Death rate") + xlab("Mean temperature (°C)") +
-  scale_x_continuous(breaks = c(20))
+  theme_classic(base_size = 15) +
+  #facet_wrap(.~inf_status) +
+  scale_x_continuous(breaks = c(0,1,3,7))+
+  labs(x = "Magnitude of fluctuation (°C)", 
+       y = expression(paste("Death rate ", (day^-1)))) +
+  theme(legend.position = "none")
+ggsave("Documents/GitHub/2022-thermal-zoop-experiments/figures/lifetable_uninfect_d.png",width=3.7,height=5.5,units="in",dpi=300)
 
 # graphing the difference in r between uninfected and infected groups, just 20 and var
 lt.summary_factors$temp_var<-as.factor(lt.summary_factors$temp_var)

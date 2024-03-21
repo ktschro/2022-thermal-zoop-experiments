@@ -7,6 +7,123 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(magrittr)
+library(deSolve)
+library(bbmle)
 ```
 
+### Model 0:  
+Foraging rate in its simplest form can be calculated as:
+$$
+f=ln(\frac{R(0)}{R(t)}) \cdot \frac{V}{t}
+$$
+where R(0) is the amount of resource in the control tube, R(t) is the amount of resource in the final tube at time t, V is the volume of the tube, and t is the time of the assay. In our case, the units will be mL/minute.
+
+```{r}
+#read in rds
+forage<-readRDS("processed-data/foraging-assay/foraging_raw.rds")
+forage_sum <-readRDS("processed-data/foraging-assay/foraging.rds")
+
+#calculate foraging rate assuming no effect of length or temp/resource (is also the rate column in the rds)
+forage %<>% mutate(ID = paste(temp,resource,sep="_"),
+                   foraging_rate = log(control_read/read)*15/time)
+
+#get the average rate for each trt
+foravg <- forage %>% 
+  filter(trt=="trt") %>%
+  group_by(temp,resource) %>%
+    summarize(count=n(),
+              mean_forage = mean(rate),
+              se_forage = sd(rate)/sqrt(count))
+
+#graph it
+foravg %>% ggplot(aes(x=resource,y=mean_forage)) +
+  geom_point() +
+  geom_errorbar(aes(ymax=mean_forage+se_forage,
+                    ymin=mean_forage-se_forage),
+                    width=0.05) +
+  scale_x_continuous(breaks=c(0.1,0.5,1.0))+
+  ylab("Foraging rate (mL/min)") +
+  xlab("Resource amount (mgC/L)") +
+  facet_wrap(~temp) +
+  theme_classic()
+```
+
+#### Simulating the basic model:  
+$$
+\frac{dR}{dt} = -fRS
+$$
+Setting it up - demo:
+```{r}
+m0_num_sol <- function(t,x,params){
+  R<-x[1]
+  with(as.list(params),{
+    dR <- -f*R*S
+    res <- c(dR)
+    list(res)}
+    )
+}
+maxTime <- 500
+times<-seq(0,maxTime,by=0.5)
+vol = 15
+
+params <- c(f=0.2,
+            S=1/vol)
+
+xstart <- c(R=0.1)
+
+output <- (as.data.frame(lsoda(xstart,times,m0_num_sol,params)))
+
+r_end <- slice_max(output,time) [,2]
+
+output %>% ggplot(aes(x=time,y=R)) + geom_line() + theme_classic()
+```
+
+#### The optimizer:  
+```{r}
+m0_params <- forage_sum %>% select(temp, resource, rate_mean, rate_len_mean, conc_mean, amt_mean, time_mean, length_mean, ID)
+
+m0_ll <- function(f){
+  data <- tmp
+  resid_df <- tibble(resid=0, forage$ID)
+    for (i in 1:nrow(forage)) {
+    maxTime <- forage$time[i] #sets endpoint time
+    times <- seq(0, maxTime, by=0.5)
+    params <- c(f=f,
+                S=1/vol)
+    xstart <- c(R=forage$resource[i]) #absolute resource amt in tube
+    output <- as.data.frame(lsoda(xstart, times, m0_num_sol, params, hmax = 0.1))
+    
+    r_end <- slice_max(output, time)[,2]
+    
+    r_end <- ifelse(r_end<0, 0, r_end) #ensure that final resource concentration is never negative
+      
+    resid_df$resid[i] <- r_end - data$amt_rem[i]
+    }
+  
+    nll <- dnorm(resid_df$resid, 
+                 mean = 0, 
+                 sd = sd(resid_df$resid, na.rm = T), 
+                 log = T)
+    -sum(nll, na.rm = T)
+}
+```
+
+```{r}
+start_time <- Sys.time()
+m0_f_fits <- list()
+for(j in 1:nrow(m0_params)){
+  tmp <- forage %>% filter(ID==m0_params$ID[j])
+  m0_f_fits[[j]]<-mle2(m0_ll,
+                    start=list(f=m0_params$rate_mean[j]),
+                    method = "Brent", # I use Brent because we only have on parameter
+                    lower = 0,
+                    upper = 0.005)
+}
+
+end_time <- Sys.time()
+m0_runtime <- end_time - start_time
+m0_runtime
+```
 
