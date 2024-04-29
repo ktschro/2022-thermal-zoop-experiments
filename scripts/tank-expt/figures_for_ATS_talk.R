@@ -68,7 +68,8 @@ total_summary <- data %>%
             mean_cerio = mean(cerio,na.rm=T),
             se_cerio = sd(cerio,na.rm=T)/sqrt(count))
 
-ggplot(total_summary,aes(x=exp_day,y=mean_daphnia_prev,color=temp,group=temp)) +
+total_summary %>% filter(community=="CM") %>%
+ggplot(aes(x=exp_day,y=mean_cerio_prev,color=Temperature,group=Temperature)) +
   geom_point() +
   geom_line() +
   #geom_errorbar(aes(ymin=mean_daphnia_prev-se_daphnia_prev,ymax=mean_daphnia_prev+se_daphnia_prev)) +
