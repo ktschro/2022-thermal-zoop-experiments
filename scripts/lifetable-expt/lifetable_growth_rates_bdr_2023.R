@@ -12,7 +12,7 @@ life <- read.csv("Library/CloudStorage/OneDrive-SharedLibraries-UniversityofGeor
 #calculate lifespan, get treatment IDs ---- 
 #add start of life for each species - daphnia 'born' on 4/5/22 and cerio 'born' on 4/6/22. Calculate lifespan based on difference between date of death and birthdate. Then remove the males
 life %<>% mutate(birthdate = ifelse(species == "daphnia", "4/5/22", "4/6/22"), 
-                    lifespan = as.numeric(mdy(final_date) - mdy(birthdate))) %>% filter(is.na(male))
+                 lifespan = as.numeric(mdy(final_date) - mdy(birthdate))) %>% filter(is.na(male))
 
 #change inf status to inf or 0, add column for dead Daphnia
 life %<>% mutate(inf_status = replace_na(inf, 0), 
@@ -27,12 +27,12 @@ length(treatments) #length tells you how big to make the final dataframe. In thi
 #add in experiment metadata ----
 age.at.start <- 5  #this tells the function what the starting age of animals in the spread sheet is
 day.columns <- which(names(life)%in%c("X4.10.22","X4.11.22","X4.12.22","X4.13.22","X4.14.22","X4.15.22","X4.16.22",
-                                         "X4.17.22","X4.18.22","X4.19.22","X4.20.22","X4.21.22","X4.22.22","X4.23.22",
-                                         "X4.24.22","X4.25.22","X4.26.22","X4.27.22","X4.28.22","X4.29.22","X4.30.22",
-                                         "X5.1.22","X5.2.22","X5.3.22","X5.4.22","X5.5.22","X5.6.22","X5.7.22",
-                                         "X5.8.22","X5.9.22","X5.10.22","X5.11.22","X5.12.22","X5.13.22","X5.14.22",
-                                         "X5.15.22","X5.16.22","X5.17.22","X5.18.22","X5.19.22","X5.20.22","X5.21.22",
-                                         "X5.22.22","X5.23.22"))
+                                      "X4.17.22","X4.18.22","X4.19.22","X4.20.22","X4.21.22","X4.22.22","X4.23.22",
+                                      "X4.24.22","X4.25.22","X4.26.22","X4.27.22","X4.28.22","X4.29.22","X4.30.22",
+                                      "X5.1.22","X5.2.22","X5.3.22","X5.4.22","X5.5.22","X5.6.22","X5.7.22",
+                                      "X5.8.22","X5.9.22","X5.10.22","X5.11.22","X5.12.22","X5.13.22","X5.14.22",
+                                      "X5.15.22","X5.16.22","X5.17.22","X5.18.22","X5.19.22","X5.20.22","X5.21.22",
+                                      "X5.22.22","X5.23.22"))
 # which columns in the spreadsheet have entries that correspond to # babies on each day?
 max.age <- length(day.columns) + age.at.start - 1 # we use this in the calculation of death rate, in case some hosts never died
 

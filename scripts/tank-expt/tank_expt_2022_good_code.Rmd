@@ -38,9 +38,11 @@ ysi <- read_csv("tank_ysi.csv")
 
 Fixing YSI data to look normal
 ```{r}
-ysi %<>% rename('temp_f' = '?F-21A104910', "do_per" = "DO %-21A106679", "do_conc" = "DO mg/L-21A106679",
-                "ph" = "pH-21B101988", "ph_mv" = "pH mV-21B101988", "chlor_rfu" = "Chlorophyll RFU-21B101736",
-                "chlor_conc" = "Chlorophyll ug/L-21B101736")
+colnames(ysi)[5:24] <- c("temp_f","mmHg","do_per","do_conc","spc","c-us","nlfc",
+                         "ohm","tds","sal","density","density_2","pH","pH_mv",
+                         "phyco_rfu","phyco_ug","chlor_rfu","chlor_ug","DEP","vpos")
+
+
 ysi %<>% mutate(bucket = as.factor(as.numeric(gsub("Tank ", "", Site))))
 ysi %<>% mutate(temp_c = (temp_f-32)*(5/9))
 ysi$Date <- mdy(ysi$Date)
@@ -84,8 +86,10 @@ data %<>% mutate(total = rowSums(across(juvenile_daphnia_uninf:cerio_inf),na.rm=
 
 #total zoop for ESA
 total_summary <- data %>% 
-  group_by(temp,sample_date,community) %>% summarize(total = mean(total,na.rm=TRUE),
-                                           se = sd(total)/sqrt(n()))
+  group_by(temp,sample_date,community) %>% 
+  dplyr::summarise(total = mean(total,na.rm=TRUE),
+            count = n(),
+              se = sd(total)/sqrt(count))
 
 data %>% filter(community=="DM"|community=="D") %>%
   filter(bucket!="30"&bucket!="26"&bucket!="23"&bucket!="22") %>%
@@ -96,6 +100,21 @@ data %>% filter(community=="DM"|community=="D") %>%
   geom_line(data=filter(total_summary,community=="DM"|community=="D"),color="black")+
   scale_color_discrete() + 
   facet_grid(rows=vars(community),cols=vars(temp)) +
+  theme_classic() + 
+  ylab("Population Size (# of zoops)") +
+  theme(text = element_text(size = 20),legend.position="none")+
+  xlab("Sampling Date")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+data %>% filter(community=="D") %>%
+  filter(bucket!="30"&bucket!="26"&bucket!="23"&bucket!="22") %>%
+  ggplot(aes(x=sample_date,y=total))+ 
+  geom_point(color="lightgrey") +
+  geom_line(aes(group = bucket),color="lightgrey") + 
+  geom_point(data=filter(total_summary,community=="D"),color="black") + 
+  geom_line(data=filter(total_summary,community=="D"),color="black")+
+  scale_color_discrete() + 
+  facet_wrap(~temp,nrow=1) +
   theme_classic() + 
   ylab("Population Size (# of zoops)") +
   theme(text = element_text(size = 20),legend.position="none")+
@@ -235,7 +254,7 @@ ggplot(aes(x=sample_date,y=daphnia_prev))+
   xlab("Sampling Date")
 
 prev_summary <- data %>% filter(community=="DCM"|community=="DM") %>%
-  group_by(temp,sample_date) %>% summarize(daphnia_prev = mean(daphnia_prev,na.rm=TRUE),
+  group_by(temp,sample_date) %>% dplyr::summarize(daphnia_prev = mean(daphnia_prev,na.rm=TRUE),
                                            se = sd(daphnia_prev)/sqrt(n()))
 
 prev_summary %>% 
@@ -263,30 +282,31 @@ ggplot(filter(data,community=="CM"|community=="DCM"),aes(x=sample_date,y=cerio_p
 ###Summary data
 ```{r,include=F}
 #try filtering out 26 and 30 for 25 and var
-summary <- data %>% group_by(treatment, sample_date) %>% summarize(mean_juvenile = mean(juvenile_daphnia_uninf),
-                                                                se_juvenile_daphnia_uninf=sqrt(var(juvenile_daphnia_uninf,na.rm=T)/n()),
-                                                                mean_adult = mean(adult_daphnia_uninf),
-                                                                se_adult = sqrt(var(adult_daphnia_uninf,na.rm=T)/n()),
-                                                                mean_cerio = mean(cerio_uninf),
-                                                                se_cerio = sqrt(var(cerio_uninf,na.rm=T)/n()),
-                                                                mean_daphnia = mean(daphnia),
-                                                                se_daphnia = sqrt(var(daphnia,na.rm=T)/n()),
-                                                                mean_total = mean(total),
-                                                                se_total = sqrt(var(total,na.rm=T)/n()),
-                                                                mean_daphnia_inf = mean(daphnia_inf),
-                                                                se_daphnia_inf = sqrt(var(daphnia_inf,na.rm=T)/n()),
-                                                                mean_cerio_inf = mean(cerio_inf),
-                                                                se_cerio_inf = sqrt(var(cerio_inf,na.rm=T)/n()),
-                                                                mean_daphnia_prev = mean(daphnia_prev),
-                                                                se_daphnia_prev = sqrt(var(daphnia_prev,na.rm=T)/n()),
-                                                                mean_cerio_prev = mean(cerio_prev),
-                                                                se_cerio_prev = sqrt(var(cerio_prev,na.rm=T)/n()),
-                                                                mean_d_ratio = mean(d_ratio),
-                                                                se_d_ratio = sqrt(var(d_ratio,na.rm=T)/n()),
-                                                                mean_j_ratio = mean(j_ratio),
-                                                                se_j_ratio = sqrt(var(j_ratio,na.rm=T)/n()),
-                                                                temp = temp,
-                                                                community = community)
+summary <- data %>% group_by(treatment, sample_date) %>% 
+  dplyr::summarize(mean_juvenile = mean(juvenile_daphnia_uninf),
+            se_juvenile_daphnia_uninf=sqrt(var(juvenile_daphnia_uninf,na.rm=T)/n()),
+            mean_adult = mean(adult_daphnia_uninf),
+            se_adult = sqrt(var(adult_daphnia_uninf,na.rm=T)/n()),
+            mean_cerio = mean(cerio_uninf),
+            se_cerio = sqrt(var(cerio_uninf,na.rm=T)/n()),
+            mean_daphnia = mean(daphnia),
+            se_daphnia = sqrt(var(daphnia,na.rm=T)/n()),
+            mean_total = mean(total),
+            se_total = sqrt(var(total,na.rm=T)/n()),
+            mean_daphnia_inf = mean(daphnia_inf),
+            se_daphnia_inf = sqrt(var(daphnia_inf,na.rm=T)/n()),
+            mean_cerio_inf = mean(cerio_inf),
+            se_cerio_inf = sqrt(var(cerio_inf,na.rm=T)/n()),
+            mean_daphnia_prev = mean(daphnia_prev),
+            se_daphnia_prev = sqrt(var(daphnia_prev,na.rm=T)/n()),
+            mean_cerio_prev = mean(cerio_prev),
+            se_cerio_prev = sqrt(var(cerio_prev,na.rm=T)/n()),
+            mean_d_ratio = mean(d_ratio),
+            se_d_ratio = sqrt(var(d_ratio,na.rm=T)/n()),
+            mean_j_ratio = mean(j_ratio),
+            se_j_ratio = sqrt(var(j_ratio,na.rm=T)/n()),
+            temp = temp,
+            community = community)
 ```
 
 ####Summary graphs by sampling date for temperature trends in density and infection
@@ -583,13 +603,14 @@ data %>% filter(community!="CM") %>%
   ylab("Number of infected individuals") + xlab("Total Daphnia density")
 
 data %>% filter(community!="CM") %>%
-  mutate(bucket56 = ifelse(bucket=="56","56","not")) %>%
+  #mutate(bucket56 = ifelse(bucket=="56","56","not")) %>%
   filter(daphnia_prev>0) %>%
-  ggplot(aes(x=daphnia_inf,y=daphnia_prev,color=bucket56)) +
+  ggplot(aes(x=daphnia_inf,y=daphnia_prev)) +
   geom_point() +
   theme_classic() +
-  facet_wrap(~temp) +
-  ylab("Infection prevalence") + xlab("Number of infected Daphnia")
+  facet_wrap(~temp,nrow=1) +
+  ylab("Infection prevalence") + xlab("Number of infected Daphnia") +
+  geom_smooth(method='lm',se=F,color="gray60")
 
 ```
 
